@@ -40,6 +40,7 @@ class Bird:
         self.y = SCREEN_HEIGHT // 2
         self.radius = 15
         self.velocity = 0
+        self.hit_ceiling = False  # Track ceiling collision
 
     def flap(self):
         self.velocity = FLAP_STRENGTH
@@ -47,6 +48,14 @@ class Bird:
     def move(self):
         self.velocity += GRAVITY
         self.y += self.velocity
+        
+        # Handle ceiling collision (treat as wall, not death)
+        if self.y - self.radius < 0:
+            self.y = self.radius  # Stop at ceiling
+            self.velocity = 0  # Stop upward movement
+            self.hit_ceiling = True  # Mark ceiling collision
+        else:
+            self.hit_ceiling = False  # Reset ceiling collision flag
 
     def draw(self):
         pygame.draw.circle(screen, BLUE, (self.x, int(self.y)), self.radius)
@@ -54,6 +63,7 @@ class Bird:
     def reset(self):
         self.y = SCREEN_HEIGHT // 2
         self.velocity = 0
+        self.hit_ceiling = False
 
 # Pipe class
 class Pipe:
@@ -172,8 +182,8 @@ def main():
             pipes.append(Pipe(SCREEN_WIDTH + 200))
             score += 1
 
-        # Check if bird hits the ground or flies too high
-        if bird.y - bird.radius < 0 or bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
+        # Check if bird hits the ground (removed ceiling check)
+        if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
             show_game_over_screen(score)
             # Reset game
             bird.reset()

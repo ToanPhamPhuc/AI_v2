@@ -32,13 +32,47 @@ class FlappyBirdAI:
         return (bird_y, bird_velocity, pipe_x, pipe_gap_y)
     
     def get_action(self, state):
-        """Choose action using epsilon-greedy policy"""
+        """Choose action using epsilon-greedy policy with smart initialization"""
         if random.random() < self.epsilon:
             return random.randint(0, 1)  # Random action
         
         # Get Q-values for current state
         q_values = self.q_table.get(state, [0, 0])
+        
+        # If this is a new state, provide some smart guidance
+        if state not in self.q_table:
+            # For new states, prefer not flapping initially (more conservative)
+            # This helps prevent the AI from flapping unnecessarily at the start
+            return 0  # Don't flap for new states initially
+        
+        # If Q-values are equal, prefer not flapping (more conservative)
+        if q_values[0] == q_values[1]:
+            return 0
+        
         return np.argmax(q_values)  # Best action
+    
+    def get_smart_action(self, state, bird, pipes):
+        """Get action with additional smart logic for edge cases"""
+        if not pipes:
+            return 0  # No pipes, don't flap
+        
+        # Get the next pipe
+        next_pipe = pipes[0]
+        
+        # Emergency flap if bird is about to hit the ground
+        if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT - 20:
+            return 1  # Flap to avoid ground
+        
+        # Don't flap if bird is too high (near ceiling)
+        if bird.y < SCREEN_HEIGHT // 4:  # Upper quarter of screen
+            return 0  # Don't flap when near ceiling
+        
+        # If pipe is very close and bird is too low, flap
+        if next_pipe.x < bird.x + 100 and bird.y > next_pipe.top_height + PIPE_GAP - 30:
+            return 1  # Flap to get through gap
+        
+        # Use regular Q-learning action
+        return self.get_action(state)
     
     def update_epsilon(self):
         """Decay epsilon over time to reduce exploration"""
@@ -58,13 +92,13 @@ class FlappyBirdAI:
         self.q_table[state][action] = new_q
     
     def end_episode(self):
-        """Called at the end of each episode to update learning parameters"""
+        """Called at the end of each generation to update learning parameters"""
         self.episode_count += 1
         self.update_epsilon()
         
-        # Print epsilon every 1000 episodes
+        # Print epsilon every 1000 generations
         if self.episode_count % 1000 == 0:
-            print(f"Episode {self.episode_count}, Epsilon: {self.epsilon:.4f}")
+            print(f"Generation {self.episode_count}, Epsilon: {self.epsilon:.4f}")
     
     def save_q_table(self, filename=Q_TABLE_FILE):
         """Save Q-table to file"""

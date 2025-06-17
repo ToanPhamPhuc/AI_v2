@@ -49,4 +49,5 @@ DEATH_PENALTY = -50.0  # Reduced from -100.0 to avoid too harsh penalties
 HEIGHT_PENALTY = -0.05  # Reduced from -0.1
 PIPE_PROXIMITY_REWARD = 1.0  # Reduced from 2.0
 PIPE_DISTANCE_PENALTY = -0.5  # Reduced from -1.0
-FLAP_PENALTY = -0.1  # New: small penalty for unnecessary flapping 
+FLAP_PENALTY = -0.1  # New: small penalty for unnecessary flapping
+CEILING_COLLISION_PENALTY = -2.0  # New: penalty for hitting ceiling 
