@@ -26,9 +26,9 @@ HIGH_SCORE_FILE = "high_score.txt"
 Q_TABLE_FILE = "q_table.json"
 
 # AI Learning parameters
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 DISCOUNT_FACTOR = 0.95
-EPSILON = 0.1
+EPSILON = 0.05
 
 # AI Training parameters
 DEFAULT_EPISODES = 1000

@@ -61,7 +61,15 @@ class FlappyBirdAI:
     def load_q_table(self, filename=Q_TABLE_FILE):
         """Load Q-table from file"""
         if os.path.exists(filename):
-            with open(filename, 'r') as f:
-                loaded_q_table = json.load(f)
-                # Convert string keys back to tuples
-                self.q_table = {eval(k): v for k, v in loaded_q_table.items()} 
+            try:
+                with open(filename, 'r') as f:
+                    loaded_q_table = json.load(f)
+                    # Convert string keys back to tuples
+                    self.q_table = {eval(k): v for k, v in loaded_q_table.items()}
+                    print(f"Loaded Q-table with {len(self.q_table)} states")
+            except (json.JSONDecodeError, ValueError, SyntaxError) as e:
+                print(f"Error loading Q-table: {e}. Starting with empty Q-table.")
+                self.q_table = {}
+        else:
+            print("No existing Q-table found. Starting with empty Q-table.")
+            self.q_table = {} 
