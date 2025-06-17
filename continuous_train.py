@@ -20,6 +20,7 @@ def continuous_train():
     generation = 0
     best_score = 0
     recent_scores = []  # Track recent scores for average
+    high_score = 0  # Track high score
     
     # Initialize AI and reward system once
     from ai_agent import FlappyBirdAI
@@ -106,7 +107,7 @@ def continuous_train():
                 state = next_state
                 
                 # Render every frame with controls displayed
-                render_frame(bird, pipes, score, generation, ai.epsilon)
+                render_frame(bird, pipes, score, generation, ai.epsilon, high_score, ai, state, action)
             
             if not training_active:
                 break
@@ -119,11 +120,15 @@ def continuous_train():
             if len(recent_scores) > 100:
                 recent_scores.pop(0)
             
-            # Update best score and save if needed
+            # Update best score and high score
             if score > best_score:
                 best_score = score
                 ai.save_q_table()
                 print(f"🎉 New best score: {best_score} (Generation {generation + 1})")
+            
+            # Update high score
+            if score > high_score:
+                high_score = score
             
             # Handle save request
             if save_requested:
@@ -136,6 +141,7 @@ def continuous_train():
                 ai.q_table = {}
                 ai.save_q_table()
                 best_score = 0
+                high_score = 0
                 recent_scores = []
                 print("🔄 Training reset! Starting fresh...")
                 reset_requested = False
@@ -143,11 +149,17 @@ def continuous_train():
             # Handle debug request
             if debug_requested:
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
+                stats = ai.get_learning_stats()
                 print(f"🔍 Debug Info:")
                 print(f"   Generation: {generation + 1}")
-                print(f"   Epsilon: {ai.epsilon:.4f}")
-                print(f"   Q-table size: {len(ai.q_table)} states")
+                print(f"   Epsilon: {stats['epsilon']:.4f}")
+                print(f"   Q-table size: {stats['q_table_size']} states")
+                print(f"   Total Q-updates: {stats['total_updates']}")
+                print(f"   Avg Q-change: {stats['avg_q_change']:.4f}")
+                print(f"   Q-value range: [{stats['min_q_value']:.2f}, {stats['max_q_value']:.2f}]")
+                print(f"   Exploration rate: {stats['exploration_rate']:.2%}")
                 print(f"   Best score: {best_score}")
+                print(f"   High score: {high_score}")
                 print(f"   Recent average: {avg_recent:.1f}")
                 print(f"   Learning rate: {ai.learning_rate}")
                 debug_requested = False
@@ -158,13 +170,13 @@ def continuous_train():
             # Print progress every 50 generations
             if generation % 50 == 0:
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
-                print(f"Generation {generation}, Current Score: {score}, Best: {best_score}, Avg: {avg_recent:.1f}, ε: {ai.epsilon:.3f}")
+                print(f"Generation {generation}, Current Score: {score}, Best: {best_score}, High: {high_score}, Avg: {avg_recent:.1f}, ε: {ai.epsilon:.3f}")
             
             # Save progress every 100 generations
             if generation % 100 == 0:
                 ai.save_q_table()
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
-                print(f"✅ Saved progress! Generation {generation}, Best score: {best_score}, Recent avg: {avg_recent:.1f}")
+                print(f"✅ Saved progress! Generation {generation}, Best score: {best_score}, High score: {high_score}, Recent avg: {avg_recent:.1f}")
             
             # Reset reward system
             reward_system.reset()
@@ -176,6 +188,7 @@ def continuous_train():
         print(f"\n🏁 Training stopped! Final stats:")
         print(f"Total generations: {generation}")
         print(f"Best score achieved: {best_score}")
+        print(f"High score achieved: {high_score}")
         if 'ai' in locals():
             print(f"Final epsilon: {ai.epsilon:.4f}")
             print(f"Q-table size: {len(ai.q_table)} states")
@@ -183,8 +196,8 @@ def continuous_train():
         pygame.quit()
         sys.exit()
 
-def render_frame(bird, pipes, score, generation, epsilon):
-    """Render a single frame for visualization with controls displayed"""
+def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state, action):
+    """Render a single frame for visualization with controls and Q-values displayed"""
     from main import screen, clock, draw_ground
     
     screen.fill(WHITE)
@@ -203,17 +216,43 @@ def render_frame(bird, pipes, score, generation, epsilon):
     
     # Game info
     score_text = font.render(f"Score: {score}", True, BLACK)
+    high_score_text = font.render(f"High Score: {high_score}", True, BLACK)
     generation_text = font.render(f"Generation: {generation}", True, BLACK)
     epsilon_text = font.render(f"Epsilon: {epsilon:.3f}", True, BLACK)
+    
+    # Q-values for current state
+    q_values = ai.q_table.get(state, [0, 0])
+    q_wait_text = font_small.render(f"Q(WAIT): {q_values[0]:.2f}", True, BLACK)
+    q_flap_text = font_small.render(f"Q(FLAP): {q_values[1]:.2f}", True, BLACK)
+    
+    # Current action indicator
+    action_text = font_small.render(f"Action: {'FLAP' if action == 1 else 'WAIT'}", True, (255, 0, 0) if action == 1 else (0, 0, 255))
+    
+    # State information
+    if pipes:
+        next_pipe = pipes[0]
+        state_info = f"Bird Y: {int(bird.y)}, Vel: {bird.velocity:.1f}, Pipe X: {int(next_pipe.x)}, Gap Y: {int(next_pipe.top_height + PIPE_GAP/2)}"
+        state_text = font_small.render(state_info, True, BLACK)
+    else:
+        state_text = font_small.render("No pipes", True, BLACK)
     
     # Controls
     controls_text1 = font_small.render("Q: Quit | S: Save | R: Reset | D: Debug", True, BLACK)
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))
-    screen.blit(generation_text, (10, 35))
-    screen.blit(epsilon_text, (10, 60))
-    screen.blit(controls_text1, (10, 85))
+    screen.blit(high_score_text, (10, 35))
+    screen.blit(generation_text, (10, 60))
+    screen.blit(epsilon_text, (10, 85))
+    
+    # Q-values section (right side)
+    screen.blit(q_wait_text, (SCREEN_WIDTH - 150, 10))
+    screen.blit(q_flap_text, (SCREEN_WIDTH - 150, 30))
+    screen.blit(action_text, (SCREEN_WIDTH - 150, 50))
+    
+    # State info (bottom)
+    screen.blit(state_text, (10, SCREEN_HEIGHT - 60))
+    screen.blit(controls_text1, (10, SCREEN_HEIGHT - 40))
     
     pygame.display.flip()
     clock.tick(60)

@@ -15,6 +15,14 @@ class FlappyBirdAI:
         self.action_size = 2  # flap or don't flap
         self.episode_count = 0
         
+        # Learning progress tracking
+        self.total_updates = 0
+        self.avg_q_change = 0.0
+        self.max_q_value = 0.0
+        self.min_q_value = 0.0
+        self.exploration_count = 0
+        self.exploitation_count = 0
+        
     def get_state(self, bird, pipes):
         """Convert game state to discrete state for Q-learning"""
         if not pipes:
@@ -34,7 +42,10 @@ class FlappyBirdAI:
     def get_action(self, state):
         """Choose action using epsilon-greedy policy with smart initialization"""
         if random.random() < self.epsilon:
+            self.exploration_count += 1
             return random.randint(0, 1)  # Random action
+        
+        self.exploitation_count += 1
         
         # Get Q-values for current state
         q_values = self.q_table.get(state, [0, 0])
@@ -79,26 +90,64 @@ class FlappyBirdAI:
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
     
     def update_q_table(self, state, action, reward, next_state):
-        """Update Q-table using Q-learning algorithm"""
+        """Update Q-table using improved Q-learning algorithm"""
         if state not in self.q_table:
             self.q_table[state] = [0, 0]
         if next_state not in self.q_table:
             self.q_table[next_state] = [0, 0]
         
-        # Q-learning update formula
+        # Store old Q-value for tracking changes
+        old_q = self.q_table[state][action]
+        
+        # Q-learning update formula: Q(s,a) = Q(s,a) + α[r + γ*max(Q(s',a')) - Q(s,a)]
         current_q = self.q_table[state][action]
         max_next_q = max(self.q_table[next_state])
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
         self.q_table[state][action] = new_q
+        
+        # Track learning progress
+        self.total_updates += 1
+        q_change = abs(new_q - old_q)
+        self.avg_q_change = (self.avg_q_change * (self.total_updates - 1) + q_change) / self.total_updates
+        
+        # Update min/max Q-values
+        all_q_values = [q for state_qs in self.q_table.values() for q in state_qs]
+        if all_q_values:
+            self.max_q_value = max(self.max_q_value, max(all_q_values))
+            self.min_q_value = min(self.min_q_value, min(all_q_values))
+    
+    def get_learning_stats(self):
+        """Get comprehensive learning statistics"""
+        total_actions = self.exploration_count + self.exploitation_count
+        exploration_rate = self.exploration_count / total_actions if total_actions > 0 else 0
+        
+        return {
+            'episode_count': self.episode_count,
+            'epsilon': self.epsilon,
+            'q_table_size': len(self.q_table),
+            'total_updates': self.total_updates,
+            'avg_q_change': self.avg_q_change,
+            'max_q_value': self.max_q_value,
+            'min_q_value': self.min_q_value,
+            'exploration_rate': exploration_rate,
+            'exploration_count': self.exploration_count,
+            'exploitation_count': self.exploitation_count
+        }
     
     def end_episode(self):
         """Called at the end of each generation to update learning parameters"""
         self.episode_count += 1
         self.update_epsilon()
         
-        # Print epsilon every 1000 generations
+        # Print detailed stats every 1000 generations
         if self.episode_count % 1000 == 0:
-            print(f"Generation {self.episode_count}, Epsilon: {self.epsilon:.4f}")
+            stats = self.get_learning_stats()
+            print(f"Generation {self.episode_count}:")
+            print(f"  Epsilon: {stats['epsilon']:.4f}")
+            print(f"  Q-table size: {stats['q_table_size']} states")
+            print(f"  Avg Q-change: {stats['avg_q_change']:.4f}")
+            print(f"  Q-value range: [{stats['min_q_value']:.2f}, {stats['max_q_value']:.2f}]")
+            print(f"  Exploration rate: {stats['exploration_rate']:.2%}")
     
     def save_q_table(self, filename=Q_TABLE_FILE):
         """Save Q-table to file"""
@@ -116,6 +165,12 @@ class FlappyBirdAI:
                     # Convert string keys back to tuples
                     self.q_table = {eval(k): v for k, v in loaded_q_table.items()}
                     print(f"Loaded Q-table with {len(self.q_table)} states")
+                    
+                    # Update max/min Q-values from loaded data
+                    all_q_values = [q for state_qs in self.q_table.values() for q in state_qs]
+                    if all_q_values:
+                        self.max_q_value = max(all_q_values)
+                        self.min_q_value = min(all_q_values)
             except (json.JSONDecodeError, ValueError, SyntaxError) as e:
                 print(f"Error loading Q-table: {e}. Starting with empty Q-table.")
                 self.q_table = {}
