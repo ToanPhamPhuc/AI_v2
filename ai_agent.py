@@ -9,9 +9,11 @@ class FlappyBirdAI:
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.epsilon = epsilon
+        self.initial_epsilon = epsilon
         self.q_table = {}
         self.state_size = 4  # bird_y, bird_velocity, pipe_x, pipe_gap_y
         self.action_size = 2  # flap or don't flap
+        self.episode_count = 0
         
     def get_state(self, bird, pipes):
         """Convert game state to discrete state for Q-learning"""
@@ -38,6 +40,10 @@ class FlappyBirdAI:
         q_values = self.q_table.get(state, [0, 0])
         return np.argmax(q_values)  # Best action
     
+    def update_epsilon(self):
+        """Decay epsilon over time to reduce exploration"""
+        self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
+    
     def update_q_table(self, state, action, reward, next_state):
         """Update Q-table using Q-learning algorithm"""
         if state not in self.q_table:
@@ -50,6 +56,15 @@ class FlappyBirdAI:
         max_next_q = max(self.q_table[next_state])
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
         self.q_table[state][action] = new_q
+    
+    def end_episode(self):
+        """Called at the end of each episode to update learning parameters"""
+        self.episode_count += 1
+        self.update_epsilon()
+        
+        # Print epsilon every 1000 episodes
+        if self.episode_count % 1000 == 0:
+            print(f"Episode {self.episode_count}, Epsilon: {self.epsilon:.4f}")
     
     def save_q_table(self, filename=Q_TABLE_FILE):
         """Save Q-table to file"""

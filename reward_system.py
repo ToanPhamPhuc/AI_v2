@@ -8,8 +8,9 @@ class RewardSystem:
         self.score_reward = SCORE_REWARD
         self.death_penalty = DEATH_PENALTY
         self.height_penalty = HEIGHT_PENALTY
+        self.flap_penalty = FLAP_PENALTY
         
-    def calculate_reward(self, bird, pipes, score, game_over):
+    def calculate_reward(self, bird, pipes, score, game_over, action=None):
         """Calculate reward based on current game state"""
         reward = 0
         
@@ -43,6 +44,10 @@ class RewardSystem:
                 reward += PIPE_PROXIMITY_REWARD
             elif distance_to_pipe_center > 100:
                 reward += PIPE_DISTANCE_PENALTY
+        
+        # Flap penalty (discourage unnecessary flapping)
+        if action == 1:  # If the AI chose to flap
+            reward += self.flap_penalty
         
         return reward
     

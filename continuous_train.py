@@ -14,14 +14,16 @@ def continuous_train():
     print("Press 'Q' to quit training.")
     print("Press 'S' to save current progress.")
     print("Press 'R' to reset training (start over).")
+    print("Press 'D' to show debug info.")
     
     # Global flag to control training
     training_active = True
     save_requested = False
     reset_requested = False
+    debug_requested = False
     
     def handle_input():
-        nonlocal training_active, save_requested, reset_requested
+        nonlocal training_active, save_requested, reset_requested, debug_requested
         while training_active:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
@@ -36,6 +38,9 @@ def continuous_train():
                     elif event.key == pygame.K_r:
                         print("\nResetting training...")
                         reset_requested = True
+                    elif event.key == pygame.K_d:
+                        print("\nDebug info requested...")
+                        debug_requested = True
             time.sleep(0.1)  # Small delay to prevent high CPU usage
     
     # Start input handling in a separate thread
@@ -45,6 +50,7 @@ def continuous_train():
     
     episode = 0
     best_score = 0
+    recent_scores = []  # Track recent scores for average
     
     try:
         while training_active:
@@ -107,8 +113,8 @@ def continuous_train():
                     # Get next state
                     next_state = ai.get_state(bird, pipes)
                     
-                    # Calculate reward
-                    reward = reward_system.calculate_reward(bird, pipes, score, game_over)
+                    # Calculate reward (now includes action for flap penalty)
+                    reward = reward_system.calculate_reward(bird, pipes, score, game_over, action)
                     
                     # Update Q-table
                     ai.update_q_table(state, action, reward, next_state)
@@ -120,16 +126,24 @@ def continuous_train():
                     if episode % RENDER_EVERY == 0:
                         render_frame(bird, pipes, score, episode)
                 
+                # End episode and update learning parameters
+                ai.end_episode()
+                
+                # Track recent scores
+                recent_scores.append(score)
+                if len(recent_scores) > 100:
+                    recent_scores.pop(0)
+                
                 # Update best score and save if needed
                 if score > best_score:
                     best_score = score
                     ai.save_q_table()
-                    print(f"New best score: {best_score} (Episode {episode + batch_episode + 1})")
+                    print(f"🎉 New best score: {best_score} (Episode {episode + batch_episode + 1})")
                 
                 # Handle save request
                 if save_requested:
                     ai.save_q_table()
-                    print(f"Progress saved! Current best score: {best_score}")
+                    print(f"💾 Progress saved! Current best score: {best_score}")
                     save_requested = False
                 
                 # Handle reset request
@@ -137,29 +151,46 @@ def continuous_train():
                     ai.q_table = {}
                     ai.save_q_table()
                     best_score = 0
-                    print("Training reset! Starting fresh...")
+                    recent_scores = []
+                    print("🔄 Training reset! Starting fresh...")
                     reset_requested = False
+                
+                # Handle debug request
+                if debug_requested:
+                    avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
+                    print(f"🔍 Debug Info:")
+                    print(f"   Episode: {episode + batch_episode + 1}")
+                    print(f"   Epsilon: {ai.epsilon:.4f}")
+                    print(f"   Q-table size: {len(ai.q_table)} states")
+                    print(f"   Best score: {best_score}")
+                    print(f"   Recent average: {avg_recent:.1f}")
+                    print(f"   Learning rate: {ai.learning_rate}")
+                    debug_requested = False
                 
                 episode += 1
                 
                 # Print progress every 50 episodes
                 if (episode + batch_episode + 1) % 50 == 0:
-                    print(f"Episode {episode + batch_episode + 1}, Current Score: {score}, Best: {best_score}")
+                    avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
+                    print(f"Episode {episode + batch_episode + 1}, Current Score: {score}, Best: {best_score}, Avg: {avg_recent:.1f}, ε: {ai.epsilon:.3f}")
                 
                 # Reset reward system
                 reward_system.reset()
             
             # Save progress after each batch
             ai.save_q_table()
-            print(f"Batch complete! Total episodes: {episode}, Best score: {best_score}")
+            avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
+            print(f"✅ Batch complete! Total episodes: {episode}, Best score: {best_score}, Recent avg: {avg_recent:.1f}")
     
     except Exception as e:
         print(f"An error occurred: {e}")
     
     finally:
-        print(f"\nTraining stopped! Final stats:")
+        print(f"\n🏁 Training stopped! Final stats:")
         print(f"Total episodes: {episode}")
         print(f"Best score achieved: {best_score}")
+        print(f"Final epsilon: {ai.epsilon:.4f}")
+        print(f"Q-table size: {len(ai.q_table)} states")
         print("Final progress has been saved.")
         pygame.quit()
         sys.exit()
