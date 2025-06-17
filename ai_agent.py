@@ -2,10 +2,10 @@ import numpy as np
 import random
 import json
 import os
-from main import *
+from config import *
 
 class FlappyBirdAI:
-    def __init__(self, learning_rate=0.1, discount_factor=0.95, epsilon=0.1):
+    def __init__(self, learning_rate=LEARNING_RATE, discount_factor=DISCOUNT_FACTOR, epsilon=EPSILON):
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.epsilon = epsilon
@@ -22,10 +22,10 @@ class FlappyBirdAI:
         next_pipe = pipes[0]
         
         # Normalize and discretize state values
-        bird_y = int(bird.y / 50)  # Discretize bird position
-        bird_velocity = int(bird.velocity / 2)  # Discretize velocity
-        pipe_x = int(next_pipe.x / 50)  # Discretize pipe distance
-        pipe_gap_y = int((next_pipe.top_height + PIPE_GAP/2) / 50)  # Discretize gap center
+        bird_y = int(bird.y / BIRD_Y_DIVISOR)  # Discretize bird position
+        bird_velocity = int(bird.velocity / BIRD_VELOCITY_DIVISOR)  # Discretize velocity
+        pipe_x = int(next_pipe.x / PIPE_X_DIVISOR)  # Discretize pipe distance
+        pipe_gap_y = int((next_pipe.top_height + PIPE_GAP/2) / PIPE_GAP_Y_DIVISOR)  # Discretize gap center
         
         return (bird_y, bird_velocity, pipe_x, pipe_gap_y)
     
@@ -51,12 +51,12 @@ class FlappyBirdAI:
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
         self.q_table[state][action] = new_q
     
-    def save_q_table(self, filename="q_table.json"):
+    def save_q_table(self, filename=Q_TABLE_FILE):
         """Save Q-table to file"""
         with open(filename, 'w') as f:
             json.dump(self.q_table, f)
     
-    def load_q_table(self, filename="q_table.json"):
+    def load_q_table(self, filename=Q_TABLE_FILE):
         """Load Q-table from file"""
         if os.path.exists(filename):
             with open(filename, 'r') as f:

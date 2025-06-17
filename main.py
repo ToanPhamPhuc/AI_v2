@@ -2,30 +2,10 @@ import pygame
 import sys
 import random
 import os
+from config import *
 
 # Initialize Pygame
 pygame.init()
-
-# Screen dimensions
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 600
-FPS = 60
-
-# Colors
-WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
-BLUE = (0, 0, 255)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-
-# Game variables
-GRAVITY = 0.5
-FLAP_STRENGTH = -10
-PIPE_SPEED = 5
-PIPE_GAP = 150
-
-# High score file
-HIGH_SCORE_FILE = "high_score.txt"
 
 # Initialize screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -79,8 +59,8 @@ class Bird:
 class Pipe:
     def __init__(self, x):
         self.x = x
-        self.top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - 50)
-        self.bottom_height = SCREEN_HEIGHT - self.top_height - PIPE_GAP
+        self.top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - GROUND_HEIGHT - 50)
+        self.bottom_height = SCREEN_HEIGHT - self.top_height - PIPE_GAP - GROUND_HEIGHT
         self.width = 50
 
     def move(self):
@@ -88,16 +68,21 @@ class Pipe:
 
     def draw(self):
         pygame.draw.rect(screen, GREEN, (self.x, 0, self.width, self.top_height))
-        pygame.draw.rect(screen, GREEN, (self.x, SCREEN_HEIGHT - self.bottom_height, self.width, self.bottom_height))
+        pygame.draw.rect(screen, GREEN, (self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT, self.width, self.bottom_height))
 
     def is_off_screen(self):
         return self.x + self.width < 0
 
     def collides_with(self, bird):
         if bird.x + bird.radius > self.x and bird.x - bird.radius < self.x + self.width:
-            if bird.y - bird.radius < self.top_height or bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height:
+            if bird.y - bird.radius < self.top_height or bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT:
                 return True
         return False
+
+def draw_ground():
+    """Draw the brown ground layer behind everything"""
+    ground_rect = pygame.Rect(0, SCREEN_HEIGHT - GROUND_HEIGHT, SCREEN_WIDTH, GROUND_HEIGHT)
+    pygame.draw.rect(screen, BROWN, ground_rect)
 
 def show_game_over_screen(score):
     global high_score
@@ -151,10 +136,15 @@ def main():
     bird = Bird()
     pipes = [Pipe(SCREEN_WIDTH + 200)]
     score = 0
-    running = True 
+    running = True
 
     while running:
+        # Clear screen with white background
         screen.fill(WHITE)
+        
+        # Draw ground layer FIRST (behind everything)
+        draw_ground()
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -183,7 +173,7 @@ def main():
             score += 1
 
         # Check if bird hits the ground or flies too high
-        if bird.y - bird.radius < 0 or bird.y + bird.radius > SCREEN_HEIGHT:
+        if bird.y - bird.radius < 0 or bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
             show_game_over_screen(score)
             # Reset game
             bird.reset()
@@ -191,12 +181,12 @@ def main():
             score = 0
             continue
 
-        # Display score
+        # Display score (on top layer)
         font = pygame.font.Font(None, 36)
         text = font.render("Score: {}".format(score), True, BLACK)
         screen.blit(text, (10, 10))
         
-        # Display high score
+        # Display high score (on top layer)
         high_score_text = font.render("High Score: {}".format(high_score), True, BLACK)
         screen.blit(high_score_text, (10, 50))
 
@@ -207,4 +197,4 @@ def main():
     sys.exit()
 
 if __name__ == "__main__":
-    main()
+    main() 

@@ -1,13 +1,13 @@
-from main import *
+from config import *
 
 class RewardSystem:
     def __init__(self):
         self.last_score = 0
         self.last_bird_y = 0
-        self.survival_reward = 1.0
-        self.score_reward = 10.0
-        self.death_penalty = -100.0
-        self.height_penalty = -0.1
+        self.survival_reward = SURVIVAL_REWARD
+        self.score_reward = SCORE_REWARD
+        self.death_penalty = DEATH_PENALTY
+        self.height_penalty = HEIGHT_PENALTY
         
     def calculate_reward(self, bird, pipes, score, game_over):
         """Calculate reward based on current game state"""
@@ -40,9 +40,9 @@ class RewardSystem:
             
             # Reward for staying close to pipe center
             if distance_to_pipe_center < 50:
-                reward += 2.0
+                reward += PIPE_PROXIMITY_REWARD
             elif distance_to_pipe_center > 100:
-                reward -= 1.0
+                reward += PIPE_DISTANCE_PENALTY
         
         return reward
     

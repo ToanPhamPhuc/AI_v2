@@ -1,9 +1,11 @@
-from main import *
+from config import *
+import pygame
 
-def train_ai(episodes=1000, render_every=100):
+def train_ai(episodes=DEFAULT_EPISODES, render_every=RENDER_EVERY):
     """Train the AI agent through multiple episodes"""
     from ai_agent import FlappyBirdAI
     from reward_system import RewardSystem
+    from main import Bird, Pipe, screen, clock, draw_ground
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
@@ -46,8 +48,8 @@ def train_ai(episodes=1000, render_every=100):
                 pipes.append(Pipe(SCREEN_WIDTH + 200))
                 score += 1
             
-            # Check boundaries
-            if bird.y - bird.radius < 0 or bird.y + bird.radius > SCREEN_HEIGHT:
+            # Check boundaries (updated for ground)
+            if bird.y - bird.radius < 0 or bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
                 game_over = True
             
             # Get next state
@@ -83,7 +85,12 @@ def train_ai(episodes=1000, render_every=100):
 
 def render_frame(bird, pipes, score, episode):
     """Render a single frame for visualization"""
+    from main import screen, clock, draw_ground
+    
     screen.fill(WHITE)
+    
+    # Draw ground layer
+    draw_ground()
     
     # Draw game objects
     bird.draw()
