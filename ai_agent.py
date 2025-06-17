@@ -53,13 +53,15 @@ class FlappyBirdAI:
     
     def save_q_table(self, filename=Q_TABLE_FILE):
         """Save Q-table to file"""
+        # Convert tuple keys to strings for JSON serialization
+        serializable_q_table = {str(k): v for k, v in self.q_table.items()}
         with open(filename, 'w') as f:
-            json.dump(self.q_table, f)
+            json.dump(serializable_q_table, f)
     
     def load_q_table(self, filename=Q_TABLE_FILE):
         """Load Q-table from file"""
         if os.path.exists(filename):
             with open(filename, 'r') as f:
-                self.q_table = json.load(f)
+                loaded_q_table = json.load(f)
                 # Convert string keys back to tuples
-                self.q_table = {eval(k): v for k, v in self.q_table.items()} 
+                self.q_table = {eval(k): v for k, v in loaded_q_table.items()} 
