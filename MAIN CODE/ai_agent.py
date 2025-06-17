@@ -2,7 +2,7 @@ import numpy as np
 import random
 import json
 import os
-from AI_v2 import *
+from main import *
 
 class FlappyBirdAI:
     def __init__(self, learning_rate=0.1, discount_factor=0.95, epsilon=0.1):

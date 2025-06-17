@@ -1,4 +1,4 @@
-from AI_v2 import *
+from main import *
 
 def train_ai(episodes=1000, render_every=100):
     """Train the AI agent through multiple episodes"""

@@ -151,7 +151,7 @@ def main():
     bird = Bird()
     pipes = [Pipe(SCREEN_WIDTH + 200)]
     score = 0
-    running = True
+    running = True 
 
     while running:
         screen.fill(WHITE)

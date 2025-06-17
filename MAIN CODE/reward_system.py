@@ -1,3 +1,5 @@
+from main import *
+
 class RewardSystem:
     def __init__(self):
         self.last_score = 0
