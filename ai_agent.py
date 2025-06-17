@@ -63,20 +63,39 @@ class FlappyBirdAI:
         return np.argmax(q_values)  # Best action
     
     def get_smart_action(self, state, bird, pipes):
-        """Get action with additional smart logic for edge cases"""
+        """Get action with additional smart logic for edge cases and goal-seeking"""
         if not pipes:
             return 0  # No pipes, don't flap
         
         # Get the next pipe
         next_pipe = pipes[0]
+        goal_center_y = next_pipe.top_height + PIPE_GAP // 2  # Center of the gap
         
         # Emergency flap if bird is about to hit the ground
         if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT - 20:
             return 1  # Flap to avoid ground
         
-        # Don't flap if bird is too high (near ceiling)
-        if bird.y < SCREEN_HEIGHT // 4:  # Upper quarter of screen
-            return 0  # Don't flap when near ceiling
+        # Don't flap if bird is too high (near ceiling) - less restrictive
+        if bird.y < SCREEN_HEIGHT // 6:  # Upper sixth of screen (less restrictive)
+            return 0  # Don't flap when very near ceiling
+        
+        # NEW: Smart goal-seeking logic (less restrictive)
+        distance_to_goal = abs(bird.y - goal_center_y)
+        
+        # If bird is significantly above the goal, don't flap (let gravity work)
+        if bird.y < goal_center_y - 60:  # Bird is well above goal (increased threshold)
+            return 0  # Don't flap, let bird fall toward goal
+        
+        # If bird is below the goal and pipe is close, flap to get through
+        if bird.y > goal_center_y + 10 and next_pipe.x < bird.x + 200:  # Bird below goal, pipe close (more lenient)
+            return 1  # Flap to get through gap
+        
+        # If bird is very close to goal center, minimal flapping
+        if distance_to_goal < 15:  # Bird is very close to goal center (smaller threshold)
+            if bird.velocity < -5:  # Bird is moving up fast (increased threshold)
+                return 0  # Don't flap, let it settle
+            elif bird.velocity > 5:  # Bird is falling fast (increased threshold)
+                return 1  # Flap to slow down
         
         # If pipe is very close and bird is too low, flap
         if next_pipe.x < bird.x + 100 and bird.y > next_pipe.top_height + PIPE_GAP - 30:

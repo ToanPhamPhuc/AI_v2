@@ -13,7 +13,7 @@ class RewardSystem:
         self.consecutive_flaps = 0  # Track consecutive flapping
         
     def calculate_reward(self, bird, pipes, score, game_over, action=None):
-        """Calculate reward based on current game state"""
+        """Calculate reward based on current game state with improved goal-seeking"""
         reward = 0
         
         # Death penalty
@@ -33,6 +33,20 @@ class RewardSystem:
         # Survival reward
         reward += self.survival_reward
         
+        # Goal-seeking reward (NEW! - encourage staying near pipe gaps)
+        if pipes:
+            next_pipe = pipes[0]
+            goal_center_y = next_pipe.top_height + PIPE_GAP // 2  # Center of the gap
+            distance_to_goal = abs(bird.y - goal_center_y)
+            
+            # Reward for being close to the goal
+            if distance_to_goal < 30:  # Very close to goal
+                reward += 1.5  # Strong reward for being in the sweet spot (reduced from 2.0)
+            elif distance_to_goal < 60:  # Close to goal
+                reward += 0.5  # Good reward for being near goal (reduced from 1.0)
+            elif distance_to_goal > 100:  # Far from goal
+                reward += -0.5  # Penalty for being far from goal (reduced from -1.0)
+        
         # Height penalty (encourage staying in middle, discourage being too high)
         center_y = SCREEN_HEIGHT // 2
         distance_from_center = abs(bird.y - center_y)
@@ -42,18 +56,6 @@ class RewardSystem:
             reward += self.height_penalty * 3  # Triple penalty for being too high
         elif distance_from_center > 100:
             reward += self.height_penalty
-        
-        # Pipe proximity reward/penalty
-        if pipes:
-            next_pipe = pipes[0]
-            pipe_center = next_pipe.top_height + PIPE_GAP // 2
-            distance_to_pipe_center = abs(bird.y - pipe_center)
-            
-            # Reward for staying close to pipe center
-            if distance_to_pipe_center < 50:
-                reward += PIPE_PROXIMITY_REWARD
-            elif distance_to_pipe_center > 100:
-                reward += PIPE_DISTANCE_PENALTY
         
         # Smart flap penalty (discourage unnecessary flapping)
         if action == 1:  # If the AI chose to flap
@@ -67,15 +69,32 @@ class RewardSystem:
             if bird.velocity < -5:  # Bird is moving upward
                 reward += self.flap_penalty * 1.5
             
-            # Extra penalty for flapping when near ceiling
-            if bird.y < SCREEN_HEIGHT // 4:  # Upper quarter of screen
-                reward += self.flap_penalty * 2  # Double penalty for flapping near ceiling
+            # NEW: Strong penalty for flapping when bird is too high above goal
+            if pipes:
+                next_pipe = pipes[0]
+                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y < goal_center_y - 60:  # Bird is significantly above goal (increased threshold)
+                    reward += self.flap_penalty * 2  # Reduced penalty (was 3x)
+            
+            # NEW: Reward for flapping when bird is below goal (needs to go up)
+            if pipes:
+                next_pipe = pipes[0]
+                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y > goal_center_y + 20:  # Bird is below goal (increased threshold)
+                    reward += 0.3  # Small reward for flapping when needed (reduced from 0.5)
             
             # Base flap penalty
             reward += self.flap_penalty
         else:
             # Reset consecutive flap counter when not flapping
             self.consecutive_flaps = 0
+            
+            # NEW: Small reward for not flapping when bird is above goal
+            if pipes:
+                next_pipe = pipes[0]
+                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y < goal_center_y - 30:  # Bird is above goal
+                    reward += 0.3  # Small reward for letting gravity work
         
         return reward
     
