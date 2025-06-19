@@ -1,10 +1,9 @@
 import pygame
-import sys
-import random
-import os
 import json
-from config import *
-
+from config.config import *
+import sys
+import os
+import random
 # Initialize Pygame
 pygame.init()
 
@@ -13,8 +12,8 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird")
 clock = pygame.time.Clock()
 
-PIPE_HEATMAP_FILE = 'pipe_heatmap.json'
-ADAPTIVE_GAP_FILE = 'adaptive_gap_offset.json'
+PIPE_HEATMAP_FILE = 'data/pipe_heatmap.json'
+ADAPTIVE_GAP_FILE = 'data/adaptive_gap_offset.json'
 
 # Global persistent heatmap
 if os.path.exists(PIPE_HEATMAP_FILE):

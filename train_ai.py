@@ -1,6 +1,6 @@
 import pygame
 import sys
-from training_loop import train_ai
+from ai.training_loop import train_ai
 from config import DEFAULT_EPISODES, RENDER_EVERY
 
 if __name__ == "__main__":

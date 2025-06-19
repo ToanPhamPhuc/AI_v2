@@ -2,7 +2,7 @@ import numpy as np
 import random
 import json
 import os
-from config import *
+from config.config import *
 
 class FlappyBirdAI:
     def __init__(self, learning_rate=LEARNING_RATE, discount_factor=DISCOUNT_FACTOR, epsilon=EPSILON):
@@ -47,7 +47,7 @@ class FlappyBirdAI:
     def get_smart_action(self, state, bird, pipes):
         if not pipes:
             return 0
-        from main import GLOBAL_PIPE_HEATMAP, get_adaptive_gap_center
+        from game.main import GLOBAL_PIPE_HEATMAP, get_adaptive_gap_center
         next_pipe = pipes[0]
         gap_center_y = get_adaptive_gap_center(next_pipe.top_height)
         upper_pipe_mouth = next_pipe.top_height
@@ -63,8 +63,8 @@ class FlappyBirdAI:
             return 0
         if distance_to_gap < -10:
             return 0
-        if distance_to_gap > 50:
-            return 1  # Bird is well below the gap center, flap to move up
+        if distance_to_gap > 25:
+            return 1
         predicted_y = int(bird.y + bird.velocity)
         if next_pipe.x < bird.x + 120 and 0 <= predicted_y < SCREEN_HEIGHT:
             top_hits = GLOBAL_PIPE_HEATMAP['top'][predicted_y]

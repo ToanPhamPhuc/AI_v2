@@ -1,8 +1,8 @@
 import pygame
 import sys
-from training_loop import train_ai
-from config import *
-from main import get_adaptive_gap_center
+from ai.training_loop import train_ai
+from config.config import *
+from game.main import get_adaptive_gap_center
 
 def continuous_train():
     """Train the AI continuously until user stops it"""
@@ -18,10 +18,11 @@ def continuous_train():
     debug_requested = False
     
     # Global variables for visual toggles
-    global show_axes, show_hitboxes, show_collision_zones
+    global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
     show_axes = False
     show_hitboxes = False
     show_collision_zones = False
+    show_gap_distances = True
     
     generation = 0
     best_score = 0
@@ -29,9 +30,9 @@ def continuous_train():
     high_score = 0  # Track high score
     
     # Initialize AI and reward system once
-    from ai_agent import FlappyBirdAI
-    from reward_system import RewardSystem
-    from main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
+    from ai.ai_agent import FlappyBirdAI
+    from game.reward_system import RewardSystem
+    from game.main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
@@ -83,12 +84,15 @@ def continuous_train():
                             show_collision_zones = not show_collision_zones
                             print("Collision zones display: " + ("ON" if show_collision_zones else "OFF"))
                         elif event.key == pygame.K_b:
-                            from main import GLOBAL_PIPE_HEATMAP, save_pipe_heatmap
+                            from game.main import GLOBAL_PIPE_HEATMAP, save_pipe_heatmap
                             for arr in (GLOBAL_PIPE_HEATMAP['top'], GLOBAL_PIPE_HEATMAP['bottom']):
                                 for i in range(len(arr)):
                                     arr[i] = 0
                             save_pipe_heatmap()
                             print("Pipe heatmap cleared!")
+                        elif event.key == pygame.K_g:
+                            show_gap_distances = not show_gap_distances
+                            print("Gap distances display: " + ("ON" if show_gap_distances else "OFF"))
                 
                 if not training_active:
                     break
@@ -107,11 +111,17 @@ def continuous_train():
                 for pipe in pipes:
                     pipe.move()
                     if pipe.collides_with(bird):
-                        # Determine if death was at top or bottom pipe
-                        if bird.y < pipe.top_height:
-                            adjust_adaptive_gap_offset('down')
-                        elif bird.y > SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT:
-                            adjust_adaptive_gap_offset('up')
+                        import game.main as main
+                        step = 1
+                        # Clamp pink line so it's always at least 50px from top and bottom pipe
+                        min_dist = 50
+                        max_offset = PIPE_GAP // 2 - min_dist
+                        min_offset = -PIPE_GAP // 2 + min_dist
+                        if bird.y < pipe.top_height + 10:
+                            main.ADAPTIVE_GAP_OFFSET = min(main.ADAPTIVE_GAP_OFFSET + step, max_offset)
+                        elif bird.y > pipe.top_height + PIPE_GAP - 10:
+                            main.ADAPTIVE_GAP_OFFSET = max(main.ADAPTIVE_GAP_OFFSET - step, min_offset)
+                        main.save_adaptive_gap_offset()
                         game_over = True
                 
                 # Remove off-screen pipes and add new ones
@@ -231,10 +241,10 @@ def continuous_train():
 
 def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state, action):
     """Render a single frame for visualization with controls and Q-values displayed"""
-    from main import screen, clock, draw_ground
+    from game.main import screen, clock, draw_ground
     
     # Global variables for visual toggles
-    global show_axes, show_hitboxes, show_collision_zones
+    global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
     
     screen.fill(WHITE)
     
@@ -280,6 +290,18 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
             # Bottom pipe collision zone
             pygame.draw.rect(screen, (255, 0, 0, 100), (pipe.x, SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT, pipe.width, pipe.bottom_height))
     
+    # Draw gap distances if enabled
+    if show_gap_distances and pipes:
+        pipe = pipes[0]
+        gap_center_y = get_adaptive_gap_center(pipe.top_height)
+        top_dist = gap_center_y - pipe.top_height
+        bottom_dist = (pipe.top_height + PIPE_GAP) - gap_center_y
+        font_dist = pygame.font.Font(None, 20)
+        top_text = font_dist.render(f"Top→Pink: {int(top_dist)} px", True, (255,0,255))
+        bottom_text = font_dist.render(f"Pink→Bottom: {int(bottom_dist)} px", True, (255,0,255))
+        screen.blit(top_text, (pipe.x + pipe.width + 5, pipe.top_height + 5))
+        screen.blit(bottom_text, (pipe.x + pipe.width + 5, pipe.top_height + PIPE_GAP - 25))
+    
     # Draw info and controls at the top
     font = pygame.font.Font(None, 24)
     font_small = pygame.font.Font(None, 18)
@@ -301,7 +323,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     # State information with bird-gap difference
     if pipes:
         next_pipe = pipes[0]
-        gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+        gap_center_y = get_adaptive_gap_center(next_pipe.top_height)
         bird_gap_diff = bird.y - gap_center_y
         state_info = f"Bird Y: {int(bird.y)}, Vel: {bird.velocity:.1f}, Pipe X: {int(next_pipe.x)}, Gap Y: {int(gap_center_y)}, Diff: {bird_gap_diff:.1f}"
         state_text = font_small.render(state_info, True, BLACK)
@@ -310,7 +332,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     
     # Controls
     controls_text1 = font_small.render("Q: Quit | S: Save | R: Reset | D: Debug", True, BLACK)
-    controls_text2 = font_small.render("A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap", True, BLACK)
+    controls_text2 = font_small.render("A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Distances", True, BLACK)
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))

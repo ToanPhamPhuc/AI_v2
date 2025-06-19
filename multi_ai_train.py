@@ -1,8 +1,6 @@
 import pygame
 import sys
-import time
-import threading
-from config import *
+from config.config import *
 import json
 
 class MultiAITrainer:
@@ -20,8 +18,8 @@ class MultiAITrainer:
         self.knowledge_sharing_strength = 0.1  # How much to blend Q-values
         
         # Initialize multiple AIs
-        from ai_agent import FlappyBirdAI
-        from reward_system import RewardSystem
+        from ai.ai_agent import FlappyBirdAI
+        from game.reward_system import RewardSystem
         
         for i in range(num_ais):
             # Each AI starts with slightly different parameters for diversity
@@ -89,7 +87,7 @@ class MultiAITrainer:
     
     def train_generation(self):
         """Train all AIs for one generation"""
-        from main import Bird, Pipe, screen, clock, draw_ground
+        from game.main import Bird, Pipe, screen, clock, draw_ground
         
         # Initialize game states for all AIs
         birds = [Bird() for _ in range(self.num_ais)]
@@ -245,7 +243,7 @@ class MultiAITrainer:
     
     def render_frame(self, bird, pipes, score, generation, epsilon, high_score, ai, state, action):
         """Render a single frame for visualization"""
-        from main import screen, clock, draw_ground
+        from game.main import screen, clock, draw_ground
         
         screen.fill(WHITE)
         

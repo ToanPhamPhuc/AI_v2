@@ -1,9 +1,9 @@
 import pygame
 import sys
-from ai_agent import FlappyBirdAI
-from reward_system import RewardSystem
-from main import Bird, Pipe, screen, clock, draw_ground
-from config import *
+from ai.ai_agent import FlappyBirdAI
+from game.reward_system import RewardSystem
+from game.main import Bird, Pipe, screen, clock, draw_ground
+from config.config import *
 
 def test_trained_ai():
     """Test the trained AI playing the game"""

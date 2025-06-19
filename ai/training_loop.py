@@ -1,11 +1,11 @@
-from config import *
+from config.config import *
 import pygame
 
 def train_ai(episodes=DEFAULT_EPISODES, render_every=RENDER_EVERY):
     """Train the AI agent through multiple episodes"""
-    from ai_agent import FlappyBirdAI
-    from reward_system import RewardSystem
-    from main import Bird, Pipe, screen, clock, draw_ground
+    from ai.ai_agent import FlappyBirdAI
+    from game.reward_system import RewardSystem
+    from game.main import Bird, Pipe, screen, clock, draw_ground
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
@@ -81,11 +81,12 @@ def train_ai(episodes=DEFAULT_EPISODES, render_every=RENDER_EVERY):
         reward_system.reset()
     
     print(f"Training complete! Best score: {best_score}")
+    ai.save_q_table()
     return ai
 
 def render_frame(bird, pipes, score, episode):
     """Render a single frame for visualization"""
-    from main import screen, clock, draw_ground
+    from game.main import screen, clock, draw_ground
     
     screen.fill(WHITE)
     

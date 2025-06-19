@@ -1,4 +1,4 @@
-from config import *
+from config.config import *
 
 class RewardSystem:
     def __init__(self):
@@ -62,7 +62,7 @@ class RewardSystem:
                 if bird.y < gap_center_y - 20:
                     reward += 0.3
         if pipes:
-            from main import GLOBAL_PIPE_HEATMAP
+            from game.main import GLOBAL_PIPE_HEATMAP
             next_pipe = pipes[0]
             gap_center_y = next_pipe.top_height + PIPE_GAP // 2
             y_int = int(bird.y)

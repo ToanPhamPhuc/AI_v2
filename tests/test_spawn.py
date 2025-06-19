@@ -1,7 +1,7 @@
 import pygame
 import sys
-from main import Bird, Pipe, screen, clock, draw_ground
-from config import *
+from game.main import Bird, Pipe, screen, clock, draw_ground
+from config.config import *
 
 def test_spawn_position():
     """Test to verify bird spawn position and show visual improvements"""
