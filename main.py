@@ -72,6 +72,8 @@ class Pipe:
         self.top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - GROUND_HEIGHT - 50)
         self.bottom_height = SCREEN_HEIGHT - self.top_height - PIPE_GAP - GROUND_HEIGHT
         self.width = 50
+        # Collision tracking for visualization
+        self.collision_points = []  # List of (x, y) points where bird hit
 
     def move(self):
         self.x -= PIPE_SPEED
@@ -79,6 +81,12 @@ class Pipe:
     def draw(self):
         pygame.draw.rect(screen, GREEN, (self.x, 0, self.width, self.top_height))
         pygame.draw.rect(screen, GREEN, (self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT, self.width, self.bottom_height))
+        
+        # Draw collision visualization
+        for point in self.collision_points:
+            x, y = point
+            # Draw blue circle at collision point with intensity based on frequency
+            pygame.draw.circle(screen, (0, 0, 255), (int(x), int(y)), 3)
 
     def is_off_screen(self):
         return self.x + self.width < 0
@@ -86,6 +94,8 @@ class Pipe:
     def collides_with(self, bird):
         if bird.x + bird.radius > self.x and bird.x - bird.radius < self.x + self.width:
             if bird.y - bird.radius < self.top_height or bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT:
+                # Record collision point for visualization
+                self.collision_points.append((bird.x, bird.y))
                 return True
         return False
 

@@ -33,28 +33,30 @@ class RewardSystem:
         # Survival reward
         reward += self.survival_reward
         
-        # Goal-seeking reward (NEW! - encourage staying near pipe gaps)
+        # Goal-seeking reward (IMPROVED - based on bird-gap difference)
         if pipes:
             next_pipe = pipes[0]
-            goal_center_y = next_pipe.top_height + PIPE_GAP // 2  # Center of the gap
-            distance_to_goal = abs(bird.y - goal_center_y)
+            gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+            bird_gap_diff = abs(bird.y - gap_center_y)
             
-            # Reward for being close to the goal
-            if distance_to_goal < 30:  # Very close to goal
-                reward += 1.5  # Strong reward for being in the sweet spot (reduced from 2.0)
-            elif distance_to_goal < 60:  # Close to goal
-                reward += 0.5  # Good reward for being near goal (reduced from 1.0)
-            elif distance_to_goal > 100:  # Far from goal
-                reward += -0.5  # Penalty for being far from goal (reduced from -1.0)
+            # Reward for being close to the gap center
+            if bird_gap_diff < 15:  # Very close to gap center
+                reward += 2.0  # Strong reward for being in the sweet spot
+            elif bird_gap_diff < 30:  # Close to gap center
+                reward += 1.0  # Good reward for being near gap center
+            elif bird_gap_diff < 50:  # Reasonable distance
+                reward += 0.2  # Small reward for being in reasonable range
+            elif bird_gap_diff > 80:  # Far from gap center
+                reward += -1.0  # Penalty for being far from gap center
         
         # Height penalty (encourage staying in middle, discourage being too high)
         center_y = SCREEN_HEIGHT // 2
         distance_from_center = abs(bird.y - center_y)
         
         # Stronger penalty for being too high (near ceiling)
-        if bird.y < SCREEN_HEIGHT // 3:  # Upper third of screen
-            reward += self.height_penalty * 3  # Triple penalty for being too high
-        elif distance_from_center > 100:
+        if bird.y < 50:  # Very close to ceiling
+            reward += self.height_penalty * 5  # Strong penalty for being too high
+        elif distance_from_center > 150:
             reward += self.height_penalty
         
         # Smart flap penalty (discourage unnecessary flapping)
@@ -63,25 +65,25 @@ class RewardSystem:
             
             # Extra penalty for consecutive flapping (prevents rapid flapping)
             if self.consecutive_flaps > 2:
-                reward += self.flap_penalty * 2  # Double penalty for excessive flapping
+                reward += self.flap_penalty * 3  # Triple penalty for excessive flapping
             
             # Penalty for flapping when bird is going up (unnecessary)
-            if bird.velocity < -5:  # Bird is moving upward
-                reward += self.flap_penalty * 1.5
+            if bird.velocity < -3:  # Bird is moving upward
+                reward += self.flap_penalty * 2
             
-            # NEW: Strong penalty for flapping when bird is too high above goal
+            # Strong penalty for flapping when bird is too high above gap
             if pipes:
                 next_pipe = pipes[0]
-                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
-                if bird.y < goal_center_y - 60:  # Bird is significantly above goal (increased threshold)
-                    reward += self.flap_penalty * 2  # Reduced penalty (was 3x)
+                gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y < gap_center_y - 40:  # Bird is significantly above gap
+                    reward += self.flap_penalty * 3  # Strong penalty for unnecessary flapping
             
-            # NEW: Reward for flapping when bird is below goal (needs to go up)
+            # Reward for flapping when bird is below gap (needs to go up)
             if pipes:
                 next_pipe = pipes[0]
-                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
-                if bird.y > goal_center_y + 20:  # Bird is below goal (increased threshold)
-                    reward += 0.3  # Small reward for flapping when needed (reduced from 0.5)
+                gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y > gap_center_y + 20:  # Bird is below gap
+                    reward += 0.5  # Small reward for flapping when needed
             
             # Base flap penalty
             reward += self.flap_penalty
@@ -89,11 +91,11 @@ class RewardSystem:
             # Reset consecutive flap counter when not flapping
             self.consecutive_flaps = 0
             
-            # NEW: Small reward for not flapping when bird is above goal
+            # Small reward for not flapping when bird is above gap
             if pipes:
                 next_pipe = pipes[0]
-                goal_center_y = next_pipe.top_height + PIPE_GAP // 2
-                if bird.y < goal_center_y - 30:  # Bird is above goal
+                gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+                if bird.y < gap_center_y - 20:  # Bird is above gap
                     reward += 0.3  # Small reward for letting gravity work
         
         return reward
