@@ -2,7 +2,23 @@ import pygame
 import sys
 from ai.training_loop import train_ai
 from config.config import *
-from game.main import get_adaptive_gap_center
+from game.main import get_adaptive_gap_center, ground_img, screen
+
+HIGH_SCORE_FILE = 'AI_high_score.txt'
+
+def load_high_score():
+    try:
+        with open(HIGH_SCORE_FILE, 'r') as f:
+            return int(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+def save_high_score(score):
+    try:
+        with open(HIGH_SCORE_FILE, 'w') as f:
+            f.write(str(score))
+    except Exception:
+        pass
 
 def continuous_train():
     """Train the AI continuously until user stops it"""
@@ -24,12 +40,12 @@ def continuous_train():
     generation = 0
     best_score = 0
     recent_scores = []  # Track recent scores for average
-    high_score = 0  # Track high score
+    high_score = load_high_score()  # Track high score
     
     # Initialize AI and reward system once
     from ai.ai_agent import FlappyBirdAI
     from game.reward_system import RewardSystem
-    from game.main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
+    from game.main import Bird, Pipe, clock, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
@@ -149,6 +165,7 @@ def continuous_train():
             # Update high score
             if score > high_score:
                 high_score = score
+                save_high_score(high_score)
             
             # Reset reward system
             reward_system.reset()
@@ -182,15 +199,23 @@ def continuous_train():
             print(f"Final epsilon: {ai.epsilon:.4f}")
             print(f"Q-table size: {len(ai.q_table)} states")
         print("Final progress has been saved.")
+        save_high_score(high_score)
         pygame.quit()
         sys.exit()
 
+def draw_ground():
+    ground_y = SCREEN_HEIGHT - GROUND_HEIGHT
+    for x in range(0, SCREEN_WIDTH, ground_img.get_width()):
+        screen.blit(ground_img, (x, ground_y))
+
 def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state, action):
     """Render a single frame for visualization with controls and Q-values displayed"""
-    from game.main import screen, clock, draw_ground
+    from game.main import clock, background_img
     global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
-    screen.fill(WHITE)
+    # Draw background first
+    screen.blit(background_img, (0, 0))
     draw_ground()
+    
     # Draw axes if enabled
     if show_axes:
         pygame.draw.line(screen, (200, 200, 200), (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), 1)
@@ -227,15 +252,27 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     if show_gap_distances and pipes:
         pipe = pipes[0]
         gap_center_y = get_adaptive_gap_center(pipe.top_height)
-        # Draw the pink line
-        pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 2)
-        # Draw the distances
+        # Draw the high-contrast pink line
+        pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 3)
+        # Draw the distances with black outline for contrast
         top_dist = gap_center_y - pipe.top_height
         bottom_dist = (pipe.top_height + PIPE_GAP) - gap_center_y
-        font_dist = pygame.font.Font(None, 20)
+        font_dist = pygame.font.Font(None, 22)
+        # Draw outline for top_text
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    outline = font_dist.render(f"Top→Pink: {int(top_dist)} px", True, (0,0,0))
+                    screen.blit(outline, (pipe.x + pipe.width + 5 + dx, pipe.top_height + 5 + dy))
         top_text = font_dist.render(f"Top→Pink: {int(top_dist)} px", True, (255,0,255))
-        bottom_text = font_dist.render(f"Pink→Bottom: {int(bottom_dist)} px", True, (255,0,255))
         screen.blit(top_text, (pipe.x + pipe.width + 5, pipe.top_height + 5))
+        # Draw outline for bottom_text
+        for dx in [-1, 0, 1]:
+            for dy in [-1, 0, 1]:
+                if dx != 0 or dy != 0:
+                    outline = font_dist.render(f"Pink→Bottom: {int(bottom_dist)} px", True, (0,0,0))
+                    screen.blit(outline, (pipe.x + pipe.width + 5 + dx, pipe.top_height + PIPE_GAP - 25 + dy))
+        bottom_text = font_dist.render(f"Pink→Bottom: {int(bottom_dist)} px", True, (255,0,255))
         screen.blit(bottom_text, (pipe.x + pipe.width + 5, pipe.top_height + PIPE_GAP - 25))
     
     # Draw info and controls at the top

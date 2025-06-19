@@ -189,11 +189,16 @@ class Pipe:
             return True
         return False
 
+ground_offset = 0  # Global variable for ground movement
+
 def draw_ground():
-    """Draw the ground layer using the ground sprite, aligned with the collider at the bottom."""
-    ground_y = SCREEN_HEIGHT - GROUND_HEIGHT  # Aligns the top of the sprite with the collider
-    for x in range(0, SCREEN_WIDTH, ground_img.get_width()):
+    """Draw the ground layer using the ground sprite, aligned with the collider at the bottom, and scroll it horizontally."""
+    global ground_offset
+    ground_y = SCREEN_HEIGHT - GROUND_HEIGHT
+    x = -ground_offset
+    while x < SCREEN_WIDTH:
         screen.blit(ground_img, (x, ground_y))
+        x += ground_img.get_width()
 
 def show_game_over_screen(score):
     global high_score
@@ -258,7 +263,7 @@ def adjust_adaptive_gap_offset(direction, step=5):
 
 # Main game loop
 def main():
-    global high_score
+    global high_score, ground_offset
     bird = Bird()
     pipes = [Pipe(SCREEN_WIDTH + 200)]
     score = 0
@@ -267,7 +272,8 @@ def main():
     while running:
         # Clear screen with white background
         screen.fill(WHITE)
-        
+        # Move ground
+        ground_offset = (ground_offset - PIPE_SPEED) % ground_img.get_width()
         # Draw ground layer FIRST (behind everything)
         draw_ground()
         
