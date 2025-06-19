@@ -19,7 +19,7 @@ GRAVITY = 0.5
 FLAP_STRENGTH = -10
 PIPE_SPEED = 5
 PIPE_GAP = 200  # Increased from 150 for a wider gap
-GROUND_HEIGHT = 50  # Height of the ground layer
+GROUND_HEIGHT = 100  # Height of the ground layer (increased for lower ground)
 
 # File paths
 HIGH_SCORE_FILE = "high_score.txt"

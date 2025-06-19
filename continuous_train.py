@@ -111,7 +111,7 @@ def continuous_train():
                     score += 1
                 
                 # Check boundaries (only ground, no ceiling death)
-                if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
+                if bird.get_rect().bottom > SCREEN_HEIGHT - GROUND_HEIGHT:
                     game_over = True
                 
                 # Get next state
@@ -188,42 +188,29 @@ def continuous_train():
 def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state, action):
     """Render a single frame for visualization with controls and Q-values displayed"""
     from game.main import screen, clock, draw_ground
-    
-    # Global variables for visual toggles
     global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
-    
     screen.fill(WHITE)
-    
-    # Draw ground layer
     draw_ground()
-    
     # Draw axes if enabled
     if show_axes:
-        # Vertical center line
         pygame.draw.line(screen, (200, 200, 200), (SCREEN_WIDTH//2, 0), (SCREEN_WIDTH//2, SCREEN_HEIGHT), 1)
-        # Horizontal center line
         pygame.draw.line(screen, (200, 200, 200), (0, SCREEN_HEIGHT//2), (SCREEN_WIDTH, SCREEN_HEIGHT//2), 1)
-        # Gap center line (if pipes exist)
         if pipes:
             gap_center_y = get_adaptive_gap_center(pipes[0].top_height)
             pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 2)
-    
-    # Draw pipes with hitboxes if enabled
     for pipe in pipes:
         pipe.draw()
         if show_hitboxes:
-            # Draw pipe hitbox
             pygame.draw.rect(screen, RED, (pipe.x, 0, pipe.width, pipe.top_height), 3)
             pygame.draw.rect(screen, RED, (pipe.x, SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT, pipe.width, pipe.bottom_height), 3)
-    
-    # Draw bird with color based on action and hitbox if enabled
-    bird_color = RED if action == 1 else BLUE  # Red for flap, blue for wait
-    pygame.draw.circle(screen, bird_color, (bird.x, int(bird.y)), bird.radius)
-    
+    # Draw bird sprite
+    bird.draw()
+    # Draw bird hitbox if enabled
     if show_hitboxes:
-        # Draw bird hitbox
-        pygame.draw.circle(screen, RED, (bird.x, int(bird.y)), bird.radius, 3)
-    
+        rect = bird.get_rect()
+        pygame.draw.rect(screen, RED, rect, 2)
+        # Draw ground collider
+        pygame.draw.rect(screen, RED, (0, SCREEN_HEIGHT - GROUND_HEIGHT, SCREEN_WIDTH, GROUND_HEIGHT), 2)
     # Draw collision zones if enabled
     if show_collision_zones and pipes:
         next_pipe = pipes[0]
@@ -236,10 +223,13 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
             # Bottom pipe collision zone
             pygame.draw.rect(screen, (255, 0, 0, 100), (pipe.x, SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT, pipe.width, pipe.bottom_height))
     
-    # Draw gap distances if enabled
+    # Draw gap distances and pink line if enabled
     if show_gap_distances and pipes:
         pipe = pipes[0]
         gap_center_y = get_adaptive_gap_center(pipe.top_height)
+        # Draw the pink line
+        pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 2)
+        # Draw the distances
         top_dist = gap_center_y - pipe.top_height
         bottom_dist = (pipe.top_height + PIPE_GAP) - gap_center_y
         font_dist = pygame.font.Font(None, 20)
@@ -277,7 +267,10 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
         state_text = font_small.render("No pipes", True, BLACK)
     
     # Controls
-    controls_text1 = font_small.render("Q: Quit | A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Distances", True, BLACK)
+    controls_text1 = font_small.render("Q: Quit | A: Toggle Axes | H: Toggle Hitboxes", True, BLACK)
+    controls_text2 = font_small.render("C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Dists", True, BLACK)
+
+
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))
@@ -293,6 +286,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     # State info (bottom)
     screen.blit(state_text, (10, SCREEN_HEIGHT - 80))
     screen.blit(controls_text1, (10, SCREEN_HEIGHT - 60))
+    screen.blit(controls_text2, (10, SCREEN_HEIGHT - 40))
     
     pygame.display.flip()
     clock.tick(60)

@@ -15,6 +15,16 @@ clock = pygame.time.Clock()
 PIPE_HEATMAP_FILE = 'data/pipe_heatmap.json'
 ADAPTIVE_GAP_FILE = 'data/adaptive_gap_offset.json'
 
+# Load assets
+ASSET_DIR = os.path.join(os.path.dirname(__file__), '../flappy-bird/assets')
+background_img = pygame.image.load(os.path.join(ASSET_DIR, 'background.png')).convert()
+ground_img = pygame.image.load(os.path.join(ASSET_DIR, 'ground.png')).convert_alpha()
+pipe_top_img = pygame.image.load(os.path.join(ASSET_DIR, 'pipe_top.png')).convert_alpha()
+pipe_bottom_img = pygame.image.load(os.path.join(ASSET_DIR, 'pipe_bottom.png')).convert_alpha()
+bird_up_img = pygame.image.load(os.path.join(ASSET_DIR, 'bird_up.png')).convert_alpha()
+bird_mid_img = pygame.image.load(os.path.join(ASSET_DIR, 'bird_mid.png')).convert_alpha()
+bird_down_img = pygame.image.load(os.path.join(ASSET_DIR, 'bird_down.png')).convert_alpha()
+
 # Global persistent heatmap
 if os.path.exists(PIPE_HEATMAP_FILE):
     with open(PIPE_HEATMAP_FILE, 'r') as f:
@@ -75,6 +85,8 @@ class Bird:
         self.radius = 15
         self.velocity = 0
         self.hit_ceiling = False  # Track ceiling collision
+        self.width = 34  # Approximate sprite width
+        self.height = 24  # Approximate sprite height
 
     def flap(self):
         self.velocity = FLAP_STRENGTH
@@ -82,17 +94,31 @@ class Bird:
     def move(self):
         self.velocity += GRAVITY
         self.y += self.velocity
-        
         # Handle ceiling collision (treat as wall, not death)
-        if self.y - self.radius < 0:
-            self.y = self.radius  # Stop at ceiling
+        if self.y - self.height // 2 < 0:
+            self.y = self.height // 2  # Stop at ceiling
             self.velocity = 0  # Stop upward movement
             self.hit_ceiling = True  # Mark ceiling collision
         else:
             self.hit_ceiling = False  # Reset ceiling collision flag
 
+    def get_frame(self):
+        # Choose frame based on velocity
+        if self.velocity < -2:
+            return bird_up_img
+        elif self.velocity > 2:
+            return bird_down_img
+        else:
+            return bird_mid_img
+
+    def get_rect(self):
+        img = self.get_frame()
+        return img.get_rect(center=(self.x, int(self.y)))
+
     def draw(self):
-        pygame.draw.circle(screen, BLUE, (self.x, int(self.y)), self.radius)
+        img = self.get_frame()
+        rect = img.get_rect(center=(self.x, int(self.y)))
+        screen.blit(img, rect)
 
     def reset(self):
         self.y = SCREEN_HEIGHT // 2
@@ -105,7 +131,7 @@ class Pipe:
         self.x = x
         self.top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - GROUND_HEIGHT - 50)
         self.bottom_height = SCREEN_HEIGHT - self.top_height - PIPE_GAP - GROUND_HEIGHT
-        self.width = 50
+        self.width = pipe_top_img.get_width()
         self.collision_points = []
 
     def move(self):
@@ -113,9 +139,11 @@ class Pipe:
 
     def draw(self):
         # Draw top pipe
-        pygame.draw.rect(screen, GREEN, (self.x, 0, self.width, self.top_height))
+        top_rect = pipe_top_img.get_rect(bottomleft=(self.x, self.top_height))
+        screen.blit(pipe_top_img, top_rect)
         # Draw bottom pipe
-        pygame.draw.rect(screen, GREEN, (self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT, self.width, self.bottom_height))
+        bottom_rect = pipe_bottom_img.get_rect(topleft=(self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT))
+        screen.blit(pipe_bottom_img, bottom_rect)
         # Draw heatmap for top pipe
         for y in range(self.top_height):
             hits = GLOBAL_PIPE_HEATMAP['top'][y]
@@ -140,32 +168,32 @@ class Pipe:
         return self.x + self.width < 0
 
     def collides_with(self, bird):
-        if bird.x + bird.radius > self.x and bird.x - bird.radius < self.x + self.width:
-            # Top pipe collision
-            if bird.y - bird.radius < self.top_height:
-                self.collision_points.append((bird.x, bird.y))
-                y_min = max(0, int(bird.y - bird.radius))
-                y_max = min(self.top_height, int(bird.y + bird.radius))
-                for y in range(y_min, y_max):
-                    if 0 <= y < SCREEN_HEIGHT:
-                        GLOBAL_PIPE_HEATMAP['top'][y] += 1
-                return True
-            # Bottom pipe collision
-            elif bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT:
-                self.collision_points.append((bird.x, bird.y))
-                y_min = max(0, int(bird.y - bird.radius - (SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT)))
-                y_max = min(self.bottom_height, int(bird.y + bird.radius - (SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT)))
-                for y in range(y_min, y_max):
-                    y_screen = SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT + y
-                    if 0 <= y_screen < SCREEN_HEIGHT:
-                        GLOBAL_PIPE_HEATMAP['bottom'][y_screen] += 1
-                return True
+        # Use an ellipse collider for the bird (like Unity's 2D circle collider, but matching the sprite)
+        bird_rect = bird.get_rect()
+        # Top pipe collision
+        top_pipe_rect = pygame.Rect(self.x, 0, self.width, self.top_height)
+        if bird_rect.colliderect(top_pipe_rect):
+            self.collision_points.append((bird.x, bird.y))
+            for y in range(max(0, int(bird.y - bird.height // 2)), min(self.top_height, int(bird.y + bird.height // 2))):
+                if 0 <= y < SCREEN_HEIGHT:
+                    GLOBAL_PIPE_HEATMAP['top'][y] += 1
+            return True
+        # Bottom pipe collision
+        bottom_pipe_rect = pygame.Rect(self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT, self.width, self.bottom_height)
+        if bird_rect.colliderect(bottom_pipe_rect):
+            self.collision_points.append((bird.x, bird.y))
+            for y in range(max(0, int(bird.y - bird.height // 2)), min(self.bottom_height, int(bird.y + bird.height // 2))):
+                y_screen = SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT + y
+                if 0 <= y_screen < SCREEN_HEIGHT:
+                    GLOBAL_PIPE_HEATMAP['bottom'][y_screen] += 1
+            return True
         return False
 
 def draw_ground():
-    """Draw the brown ground layer behind everything"""
-    ground_rect = pygame.Rect(0, SCREEN_HEIGHT - GROUND_HEIGHT, SCREEN_WIDTH, GROUND_HEIGHT)
-    pygame.draw.rect(screen, BROWN, ground_rect)
+    """Draw the ground layer using the ground sprite, aligned with the collider at the bottom."""
+    ground_y = SCREEN_HEIGHT - GROUND_HEIGHT  # Aligns the top of the sprite with the collider
+    for x in range(0, SCREEN_WIDTH, ground_img.get_width()):
+        screen.blit(ground_img, (x, ground_y))
 
 def show_game_over_screen(score):
     global high_score
@@ -271,7 +299,7 @@ def main():
             score += 1
 
         # Check if bird hits the ground (removed ceiling check)
-        if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT:
+        if bird.get_rect().bottom > SCREEN_HEIGHT - GROUND_HEIGHT:
             show_game_over_screen(score)
             # Reset game
             bird.reset()
