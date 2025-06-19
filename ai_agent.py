@@ -11,142 +11,99 @@ class FlappyBirdAI:
         self.epsilon = epsilon
         self.initial_epsilon = epsilon
         self.q_table = {}
-        self.state_size = 5  # bird_y, bird_velocity, pipe_x, pipe_gap_y, bird_gap_diff_discrete
-        self.action_size = 2  # flap or don't flap
         self.episode_count = 0
-        
-        # Learning progress tracking
         self.total_updates = 0
         self.avg_q_change = 0.0
         self.max_q_value = 0.0
         self.min_q_value = 0.0
         self.exploration_count = 0
         self.exploitation_count = 0
-        
+    
     def get_state(self, bird, pipes):
-        """Convert game state to discrete state for Q-learning with improved representation"""
         if not pipes:
             return (0, 0, 0, 0, 0)
-        
-        # Get the next pipe
         next_pipe = pipes[0]
-        
-        # Calculate gap center
         gap_center_y = next_pipe.top_height + PIPE_GAP // 2
-        
-        # Calculate bird's distance from gap center (NEW!)
         bird_gap_diff = bird.y - gap_center_y
-        
-        # Normalize and discretize state values
-        bird_y = int(bird.y / BIRD_Y_DIVISOR)  # Discretize bird position
-        bird_velocity = int(bird.velocity / BIRD_VELOCITY_DIVISOR)  # Discretize velocity
-        pipe_x = int(next_pipe.x / PIPE_X_DIVISOR)  # Discretize pipe distance
-        pipe_gap_y = int(gap_center_y / PIPE_GAP_Y_DIVISOR)  # Discretize gap center
-        bird_gap_diff_discrete = int(bird_gap_diff / 20)  # Discretize difference (NEW!)
-        
+        bird_y = int(bird.y / BIRD_Y_DIVISOR)
+        bird_velocity = int(bird.velocity / BIRD_VELOCITY_DIVISOR)
+        pipe_x = int(next_pipe.x / PIPE_X_DIVISOR)
+        pipe_gap_y = int(gap_center_y / PIPE_GAP_Y_DIVISOR)
+        bird_gap_diff_discrete = int(bird_gap_diff / 20)
         return (bird_y, bird_velocity, pipe_x, pipe_gap_y, bird_gap_diff_discrete)
     
     def get_action(self, state):
-        """Choose action using epsilon-greedy policy with smart initialization"""
         if random.random() < self.epsilon:
             self.exploration_count += 1
-            return random.randint(0, 1)  # Random action
-        
+            return random.randint(0, 1)
         self.exploitation_count += 1
-        
-        # Get Q-values for current state
         q_values = self.q_table.get(state, [0, 0])
-        
-        # If this is a new state, provide some smart guidance
         if state not in self.q_table:
-            # For new states, prefer not flapping initially (more conservative)
-            # This helps prevent the AI from flapping unnecessarily at the start
-            return 0  # Don't flap for new states initially
-        
-        # If Q-values are equal, prefer not flapping (more conservative)
+            return 0
         if q_values[0] == q_values[1]:
             return 0
-        
-        return np.argmax(q_values)  # Best action
+        return np.argmax(q_values)
     
     def get_smart_action(self, state, bird, pipes):
-        """Get action with improved smart logic to prevent constant flapping"""
         if not pipes:
-            return 0  # No pipes, don't flap
-        
-        # Get the next pipe
+            return 0
+        from main import GLOBAL_PIPE_HEATMAP
         next_pipe = pipes[0]
         gap_center_y = next_pipe.top_height + PIPE_GAP // 2
-        
-        # Emergency flap if bird is about to hit the ground
-        if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT - 15:
-            return 1  # Flap to avoid ground
-        
-        # Don't flap if bird is too high (near ceiling)
-        if bird.y < 50:  # Very close to ceiling
-            return 0  # Don't flap when very near ceiling
-        
-        # Calculate bird's position relative to gap
-        bird_gap_diff = bird.y - gap_center_y
-        
-        # If bird is significantly above the gap, don't flap (let gravity work)
-        if bird_gap_diff < -40:  # Bird is well above gap center
-            return 0  # Don't flap, let bird fall toward gap
-        
-        # If bird is below the gap and pipe is close, flap to get through
-        if bird_gap_diff > 20 and next_pipe.x < bird.x + 150:  # Bird below gap, pipe close
-            return 1  # Flap to get through gap
-        
-        # If bird is very close to gap center, minimal flapping
-        if abs(bird_gap_diff) < 20:  # Bird is very close to gap center
-            if bird.velocity < -3:  # Bird is moving up
-                return 0  # Don't flap, let it settle
-            elif bird.velocity > 3:  # Bird is falling
-                return 1  # Flap to slow down
-        
-        # If pipe is very close and bird is too low, flap
-        if next_pipe.x < bird.x + 80 and bird.y > next_pipe.top_height + PIPE_GAP - 25:
-            return 1  # Flap to get through gap
-        
-        # Use regular Q-learning action
+        upper_pipe_mouth = next_pipe.top_height
+        lower_pipe_mouth = SCREEN_HEIGHT - next_pipe.bottom_height - GROUND_HEIGHT
+        if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT - 10:
+            return 1
+        if bird.y - bird.radius < 10:
+            return 0
+        if bird.y - bird.radius < upper_pipe_mouth:
+            return 0
+        distance_to_gap = bird.y - gap_center_y
+        if abs(distance_to_gap) < 10 and abs(bird.velocity) < 4:
+            return 0
+        if distance_to_gap < -10:
+            return 0
+        if distance_to_gap > 10:
+            return 1
+        predicted_y = int(bird.y + bird.velocity)
+        if next_pipe.x < bird.x + 120 and 0 <= predicted_y < SCREEN_HEIGHT:
+            top_hits = GLOBAL_PIPE_HEATMAP['top'][predicted_y]
+            bottom_hits = GLOBAL_PIPE_HEATMAP['bottom'][predicted_y]
+            danger_threshold = 1
+            if predicted_y < gap_center_y and top_hits >= danger_threshold:
+                return 1
+            if predicted_y > gap_center_y and bottom_hits >= danger_threshold:
+                return 0
+        if bird.y > gap_center_y + 10 and next_pipe.x < bird.x + 120:
+            return 1
+        if bird.y > gap_center_y and bird.velocity > 4 and next_pipe.x < bird.x + 150:
+            return 1
         return self.get_action(state)
     
     def update_epsilon(self):
-        """Decay epsilon over time to reduce exploration"""
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
     
     def update_q_table(self, state, action, reward, next_state):
-        """Update Q-table using improved Q-learning algorithm"""
         if state not in self.q_table:
             self.q_table[state] = [0, 0]
         if next_state not in self.q_table:
             self.q_table[next_state] = [0, 0]
-        
-        # Store old Q-value for tracking changes
         old_q = self.q_table[state][action]
-        
-        # Q-learning update formula: Q(s,a) = Q(s,a) + α[r + γ*max(Q(s',a')) - Q(s,a)]
         current_q = self.q_table[state][action]
         max_next_q = max(self.q_table[next_state])
         new_q = current_q + self.learning_rate * (reward + self.discount_factor * max_next_q - current_q)
         self.q_table[state][action] = new_q
-        
-        # Track learning progress
         self.total_updates += 1
         q_change = abs(new_q - old_q)
         self.avg_q_change = (self.avg_q_change * (self.total_updates - 1) + q_change) / self.total_updates
-        
-        # Update min/max Q-values
         all_q_values = [q for state_qs in self.q_table.values() for q in state_qs]
         if all_q_values:
             self.max_q_value = max(self.max_q_value, max(all_q_values))
             self.min_q_value = min(self.min_q_value, min(all_q_values))
     
     def get_learning_stats(self):
-        """Get comprehensive learning statistics"""
         total_actions = self.exploration_count + self.exploitation_count
         exploration_rate = self.exploration_count / total_actions if total_actions > 0 else 0
-        
         return {
             'episode_count': self.episode_count,
             'epsilon': self.epsilon,
@@ -161,11 +118,8 @@ class FlappyBirdAI:
         }
     
     def end_episode(self):
-        """Called at the end of each generation to update learning parameters"""
         self.episode_count += 1
         self.update_epsilon()
-        
-        # Print detailed stats every 1000 generations
         if self.episode_count % 1000 == 0:
             stats = self.get_learning_stats()
             print(f"Generation {self.episode_count}:")
@@ -176,23 +130,16 @@ class FlappyBirdAI:
             print(f"  Exploration rate: {stats['exploration_rate']:.2%}")
     
     def save_q_table(self, filename=Q_TABLE_FILE):
-        """Save Q-table to file"""
-        # Convert tuple keys to strings for JSON serialization
         serializable_q_table = {str(k): v for k, v in self.q_table.items()}
         with open(filename, 'w') as f:
             json.dump(serializable_q_table, f)
     
     def load_q_table(self, filename=Q_TABLE_FILE):
-        """Load Q-table from file"""
         if os.path.exists(filename):
             try:
                 with open(filename, 'r') as f:
                     loaded_q_table = json.load(f)
-                    # Convert string keys back to tuples
                     self.q_table = {eval(k): v for k, v in loaded_q_table.items()}
-                    print(f"Loaded Q-table with {len(self.q_table)} states")
-                    
-                    # Update max/min Q-values from loaded data
                     all_q_values = [q for state_qs in self.q_table.values() for q in state_qs]
                     if all_q_values:
                         self.max_q_value = max(all_q_values)

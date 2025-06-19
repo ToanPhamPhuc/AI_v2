@@ -2,6 +2,7 @@ import pygame
 import sys
 import random
 import os
+import json
 from config import *
 
 # Initialize Pygame
@@ -11,6 +12,33 @@ pygame.init()
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird")
 clock = pygame.time.Clock()
+
+PIPE_HEATMAP_FILE = 'pipe_heatmap.json'
+
+# Global persistent heatmap
+if os.path.exists(PIPE_HEATMAP_FILE):
+    with open(PIPE_HEATMAP_FILE, 'r') as f:
+        _heatmap_data = json.load(f)
+        GLOBAL_PIPE_HEATMAP = {
+            'top': _heatmap_data.get('top', [0]*SCREEN_HEIGHT),
+            'bottom': _heatmap_data.get('bottom', [0]*SCREEN_HEIGHT)
+        }
+else:
+    GLOBAL_PIPE_HEATMAP = {'top': [0]*SCREEN_HEIGHT, 'bottom': [0]*SCREEN_HEIGHT}
+
+def save_pipe_heatmap():
+    with open(PIPE_HEATMAP_FILE, 'w') as f:
+        json.dump(GLOBAL_PIPE_HEATMAP, f)
+
+def load_pipe_heatmap():
+    global GLOBAL_PIPE_HEATMAP
+    if os.path.exists(PIPE_HEATMAP_FILE):
+        with open(PIPE_HEATMAP_FILE, 'r') as f:
+            _heatmap_data = json.load(f)
+            GLOBAL_PIPE_HEATMAP = {
+                'top': _heatmap_data.get('top', [0]*SCREEN_HEIGHT),
+                'bottom': _heatmap_data.get('bottom', [0]*SCREEN_HEIGHT)
+            }
 
 def load_high_score():
     """Load high score from file"""
@@ -72,20 +100,34 @@ class Pipe:
         self.top_height = random.randint(50, SCREEN_HEIGHT - PIPE_GAP - GROUND_HEIGHT - 50)
         self.bottom_height = SCREEN_HEIGHT - self.top_height - PIPE_GAP - GROUND_HEIGHT
         self.width = 50
-        # Collision tracking for visualization
-        self.collision_points = []  # List of (x, y) points where bird hit
+        self.collision_points = []
 
     def move(self):
         self.x -= PIPE_SPEED
 
     def draw(self):
+        # Draw top pipe
         pygame.draw.rect(screen, GREEN, (self.x, 0, self.width, self.top_height))
+        # Draw bottom pipe
         pygame.draw.rect(screen, GREEN, (self.x, SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT, self.width, self.bottom_height))
-        
-        # Draw collision visualization
+        # Draw heatmap for top pipe
+        for y in range(self.top_height):
+            hits = GLOBAL_PIPE_HEATMAP['top'][y]
+            if hits > 0:
+                intensity = min(255, hits * 30)
+                color = (0, 0, 128 + intensity//2)
+                pygame.draw.line(screen, color, (self.x, y), (self.x + self.width, y))
+        # Draw heatmap for bottom pipe
+        for y in range(self.bottom_height):
+            y_screen = SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT + y
+            hits = GLOBAL_PIPE_HEATMAP['bottom'][y_screen]
+            if hits > 0:
+                intensity = min(255, hits * 30)
+                color = (0, 0, 128 + intensity//2)
+                pygame.draw.line(screen, color, (self.x, y_screen), (self.x + self.width, y_screen))
+        # Draw collision points (optional)
         for point in self.collision_points:
             x, y = point
-            # Draw blue circle at collision point with intensity based on frequency
             pygame.draw.circle(screen, (0, 0, 255), (int(x), int(y)), 3)
 
     def is_off_screen(self):
@@ -93,9 +135,24 @@ class Pipe:
 
     def collides_with(self, bird):
         if bird.x + bird.radius > self.x and bird.x - bird.radius < self.x + self.width:
-            if bird.y - bird.radius < self.top_height or bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT:
-                # Record collision point for visualization
+            # Top pipe collision
+            if bird.y - bird.radius < self.top_height:
                 self.collision_points.append((bird.x, bird.y))
+                y_min = max(0, int(bird.y - bird.radius))
+                y_max = min(self.top_height, int(bird.y + bird.radius))
+                for y in range(y_min, y_max):
+                    if 0 <= y < SCREEN_HEIGHT:
+                        GLOBAL_PIPE_HEATMAP['top'][y] += 1
+                return True
+            # Bottom pipe collision
+            elif bird.y + bird.radius > SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT:
+                self.collision_points.append((bird.x, bird.y))
+                y_min = max(0, int(bird.y - bird.radius - (SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT)))
+                y_max = min(self.bottom_height, int(bird.y + bird.radius - (SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT)))
+                for y in range(y_min, y_max):
+                    y_screen = SCREEN_HEIGHT - self.bottom_height - GROUND_HEIGHT + y
+                    if 0 <= y_screen < SCREEN_HEIGHT:
+                        GLOBAL_PIPE_HEATMAP['bottom'][y_screen] += 1
                 return True
         return False
 

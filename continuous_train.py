@@ -30,13 +30,16 @@ def continuous_train():
     # Initialize AI and reward system once
     from ai_agent import FlappyBirdAI
     from reward_system import RewardSystem
-    from main import Bird, Pipe, screen, clock, draw_ground
+    from main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
     
     # Load existing Q-table if available
     ai.load_q_table()
+    
+    # Load pipe heatmap
+    load_pipe_heatmap()
     
     try:
         while training_active:
@@ -194,6 +197,9 @@ def continuous_train():
             
             # Reset reward system
             reward_system.reset()
+            
+            # Save heatmap after each generation
+            save_pipe_heatmap()
     
     except Exception as e:
         print(f"An error occurred: {e}")
