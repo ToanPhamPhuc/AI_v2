@@ -13,6 +13,8 @@ class RewardSystem:
     
     def calculate_reward(self, bird, pipes, score, game_over, action=None):
         reward = 0
+        next_pipe = pipes[0] if pipes else None
+        gap_center_y = next_pipe.top_height + PIPE_GAP // 2 if next_pipe else None
         if game_over:
             reward += self.death_penalty
             return reward
@@ -22,9 +24,7 @@ class RewardSystem:
             reward += self.score_reward
             self.last_score = score
         reward += self.survival_reward
-        if pipes:
-            next_pipe = pipes[0]
-            gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+        if next_pipe:
             distance_to_gap = abs(bird.y - gap_center_y)
             if distance_to_gap < 10:
                 reward += 5.0
@@ -46,9 +46,7 @@ class RewardSystem:
                 reward += self.flap_penalty * 3
             if bird.velocity < -3:
                 reward += self.flap_penalty * 2
-            if pipes:
-                next_pipe = pipes[0]
-                gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+            if next_pipe:
                 if bird.y < gap_center_y - 40:
                     reward += self.flap_penalty * 3
                 if bird.y > gap_center_y + 20:
@@ -56,15 +54,11 @@ class RewardSystem:
             reward += self.flap_penalty
         else:
             self.consecutive_flaps = 0
-            if pipes:
-                next_pipe = pipes[0]
-                gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+            if next_pipe:
                 if bird.y < gap_center_y - 20:
                     reward += 0.3
-        if pipes:
+        if next_pipe:
             from game.main import GLOBAL_PIPE_HEATMAP
-            next_pipe = pipes[0]
-            gap_center_y = next_pipe.top_height + PIPE_GAP // 2
             y_int = int(bird.y)
             if 0 <= y_int < SCREEN_HEIGHT:
                 top_hits = GLOBAL_PIPE_HEATMAP['top'][y_int]

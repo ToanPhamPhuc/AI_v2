@@ -38,8 +38,6 @@ class FlappyBirdAI:
             return random.randint(0, 1)
         self.exploitation_count += 1
         q_values = self.q_table.get(state, [0, 0])
-        if state not in self.q_table:
-            return 0
         if q_values[0] == q_values[1]:
             return 0
         return np.argmax(q_values)

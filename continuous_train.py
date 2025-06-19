@@ -13,9 +13,6 @@ def continuous_train():
     
     # Global flag to control training
     training_active = True
-    save_requested = False
-    reset_requested = False
-    debug_requested = False
     
     # Global variables for visual toggles
     global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
@@ -44,7 +41,7 @@ def continuous_train():
     load_pipe_heatmap()
     
     try:
-        while training_active:
+        while True:
             # Initialize game state for this generation
             bird = Bird()
             pipes = [Pipe(SCREEN_WIDTH + 200)]
@@ -54,45 +51,28 @@ def continuous_train():
             # Get initial state
             state = ai.get_state(bird, pipes)
             
-            while not game_over and training_active:
+            while not game_over:
                 # Handle input events in main thread
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
-                        training_active = False
-                        game_over = True
+                        return
                     elif event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_q:
-                            print("\nStopping training...")
-                            training_active = False
-                            game_over = True
-                        elif event.key == pygame.K_s:
-                            print("\nSaving progress...")
-                            save_requested = True
-                        elif event.key == pygame.K_r:
-                            print("\nResetting training...")
-                            reset_requested = True
-                        elif event.key == pygame.K_d:
-                            print("\nDebug info requested...")
-                            debug_requested = True
+                            return
                         elif event.key == pygame.K_a:
                             show_axes = not show_axes
-                            print("Axes display: " + ("ON" if show_axes else "OFF"))
                         elif event.key == pygame.K_h:
                             show_hitboxes = not show_hitboxes
-                            print("Hitboxes display: " + ("ON" if show_hitboxes else "OFF"))
                         elif event.key == pygame.K_c:
                             show_collision_zones = not show_collision_zones
-                            print("Collision zones display: " + ("ON" if show_collision_zones else "OFF"))
                         elif event.key == pygame.K_b:
                             from game.main import GLOBAL_PIPE_HEATMAP, save_pipe_heatmap
                             for arr in (GLOBAL_PIPE_HEATMAP['top'], GLOBAL_PIPE_HEATMAP['bottom']):
                                 for i in range(len(arr)):
                                     arr[i] = 0
                             save_pipe_heatmap()
-                            print("Pipe heatmap cleared!")
                         elif event.key == pygame.K_g:
                             show_gap_distances = not show_gap_distances
-                            print("Gap distances display: " + ("ON" if show_gap_distances else "OFF"))
                 
                 if not training_active:
                     break
@@ -170,39 +150,11 @@ def continuous_train():
             if score > high_score:
                 high_score = score
             
-            # Handle save request
-            if save_requested:
-                ai.save_q_table()
-                print(f"💾 Progress saved! Current best score: {best_score}")
-                save_requested = False
+            # Reset reward system
+            reward_system.reset()
             
-            # Handle reset request
-            if reset_requested:
-                ai.q_table = {}
-                ai.save_q_table()
-                best_score = 0
-                high_score = 0
-                recent_scores = []
-                print("🔄 Training reset! Starting fresh...")
-                reset_requested = False
-            
-            # Handle debug request
-            if debug_requested:
-                avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
-                stats = ai.get_learning_stats()
-                print(f"🔍 Debug Info:")
-                print(f"   Generation: {generation + 1}")
-                print(f"   Epsilon: {stats['epsilon']:.4f}")
-                print(f"   Q-table size: {stats['q_table_size']} states")
-                print(f"   Total Q-updates: {stats['total_updates']}")
-                print(f"   Avg Q-change: {stats['avg_q_change']:.4f}")
-                print(f"   Q-value range: [{stats['min_q_value']:.2f}, {stats['max_q_value']:.2f}]")
-                print(f"   Exploration rate: {stats['exploration_rate']:.2%}")
-                print(f"   Best score: {best_score}")
-                print(f"   High score: {high_score}")
-                print(f"   Recent average: {avg_recent:.1f}")
-                print(f"   Learning rate: {ai.learning_rate}")
-                debug_requested = False
+            # Save heatmap after each generation
+            save_pipe_heatmap()
             
             # Increment generation AFTER the game is complete
             generation += 1
@@ -217,12 +169,6 @@ def continuous_train():
                 ai.save_q_table()
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
                 print(f"✅ Saved progress! Generation {generation}, Best score: {best_score}, High score: {high_score}, Recent avg: {avg_recent:.1f}")
-            
-            # Reset reward system
-            reward_system.reset()
-            
-            # Save heatmap after each generation
-            save_pipe_heatmap()
     
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -331,8 +277,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
         state_text = font_small.render("No pipes", True, BLACK)
     
     # Controls
-    controls_text1 = font_small.render("Q: Quit | S: Save | R: Reset | D: Debug", True, BLACK)
-    controls_text2 = font_small.render("A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Distances", True, BLACK)
+    controls_text1 = font_small.render("Q: Quit | A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Distances", True, BLACK)
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))
@@ -348,7 +293,6 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     # State info (bottom)
     screen.blit(state_text, (10, SCREEN_HEIGHT - 80))
     screen.blit(controls_text1, (10, SCREEN_HEIGHT - 60))
-    screen.blit(controls_text2, (10, SCREEN_HEIGHT - 40))
     
     pygame.display.flip()
     clock.tick(60)
