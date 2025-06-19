@@ -18,7 +18,7 @@ BROWN = (139, 69, 19)  # Ground color
 GRAVITY = 0.5
 FLAP_STRENGTH = -10
 PIPE_SPEED = 5
-PIPE_GAP = 250  # Increased from 150 for a wider gap
+PIPE_GAP = 200  # Increased from 150 for a wider gap
 GROUND_HEIGHT = 50  # Height of the ground layer
 
 # File paths

@@ -47,9 +47,9 @@ class FlappyBirdAI:
     def get_smart_action(self, state, bird, pipes):
         if not pipes:
             return 0
-        from main import GLOBAL_PIPE_HEATMAP
+        from main import GLOBAL_PIPE_HEATMAP, get_adaptive_gap_center
         next_pipe = pipes[0]
-        gap_center_y = next_pipe.top_height + PIPE_GAP // 2
+        gap_center_y = get_adaptive_gap_center(next_pipe.top_height)
         upper_pipe_mouth = next_pipe.top_height
         lower_pipe_mouth = SCREEN_HEIGHT - next_pipe.bottom_height - GROUND_HEIGHT
         if bird.y + bird.radius > SCREEN_HEIGHT - GROUND_HEIGHT - 10:
@@ -63,8 +63,8 @@ class FlappyBirdAI:
             return 0
         if distance_to_gap < -10:
             return 0
-        if distance_to_gap > 10:
-            return 1
+        if distance_to_gap > 50:
+            return 1  # Bird is well below the gap center, flap to move up
         predicted_y = int(bird.y + bird.velocity)
         if next_pipe.x < bird.x + 120 and 0 <= predicted_y < SCREEN_HEIGHT:
             top_hits = GLOBAL_PIPE_HEATMAP['top'][predicted_y]

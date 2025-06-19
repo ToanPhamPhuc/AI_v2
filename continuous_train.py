@@ -2,6 +2,7 @@ import pygame
 import sys
 from training_loop import train_ai
 from config import *
+from main import get_adaptive_gap_center
 
 def continuous_train():
     """Train the AI continuously until user stops it"""
@@ -30,7 +31,7 @@ def continuous_train():
     # Initialize AI and reward system once
     from ai_agent import FlappyBirdAI
     from reward_system import RewardSystem
-    from main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap
+    from main import Bird, Pipe, screen, clock, draw_ground, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
     
     ai = FlappyBirdAI()
     reward_system = RewardSystem()
@@ -81,6 +82,13 @@ def continuous_train():
                         elif event.key == pygame.K_c:
                             show_collision_zones = not show_collision_zones
                             print("Collision zones display: " + ("ON" if show_collision_zones else "OFF"))
+                        elif event.key == pygame.K_b:
+                            from main import GLOBAL_PIPE_HEATMAP, save_pipe_heatmap
+                            for arr in (GLOBAL_PIPE_HEATMAP['top'], GLOBAL_PIPE_HEATMAP['bottom']):
+                                for i in range(len(arr)):
+                                    arr[i] = 0
+                            save_pipe_heatmap()
+                            print("Pipe heatmap cleared!")
                 
                 if not training_active:
                     break
@@ -99,6 +107,11 @@ def continuous_train():
                 for pipe in pipes:
                     pipe.move()
                     if pipe.collides_with(bird):
+                        # Determine if death was at top or bottom pipe
+                        if bird.y < pipe.top_height:
+                            adjust_adaptive_gap_offset('down')
+                        elif bird.y > SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT:
+                            adjust_adaptive_gap_offset('up')
                         game_over = True
                 
                 # Remove off-screen pipes and add new ones
@@ -236,7 +249,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
         pygame.draw.line(screen, (200, 200, 200), (0, SCREEN_HEIGHT//2), (SCREEN_WIDTH, SCREEN_HEIGHT//2), 1)
         # Gap center line (if pipes exist)
         if pipes:
-            gap_center_y = pipes[0].top_height + PIPE_GAP // 2
+            gap_center_y = get_adaptive_gap_center(pipes[0].top_height)
             pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 2)
     
     # Draw pipes with hitboxes if enabled
@@ -297,7 +310,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     
     # Controls
     controls_text1 = font_small.render("Q: Quit | S: Save | R: Reset | D: Debug", True, BLACK)
-    controls_text2 = font_small.render("A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones", True, BLACK)
+    controls_text2 = font_small.render("A: Toggle Axes | H: Toggle Hitboxes | C: Toggle Collision Zones | B: Clear Pipe Heatmap", True, BLACK)
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))

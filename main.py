@@ -14,6 +14,7 @@ pygame.display.set_caption("Flappy Bird")
 clock = pygame.time.Clock()
 
 PIPE_HEATMAP_FILE = 'pipe_heatmap.json'
+ADAPTIVE_GAP_FILE = 'adaptive_gap_offset.json'
 
 # Global persistent heatmap
 if os.path.exists(PIPE_HEATMAP_FILE):
@@ -25,6 +26,12 @@ if os.path.exists(PIPE_HEATMAP_FILE):
         }
 else:
     GLOBAL_PIPE_HEATMAP = {'top': [0]*SCREEN_HEIGHT, 'bottom': [0]*SCREEN_HEIGHT}
+
+if os.path.exists(ADAPTIVE_GAP_FILE):
+    with open(ADAPTIVE_GAP_FILE, 'r') as f:
+        ADAPTIVE_GAP_OFFSET = json.load(f).get('offset', 0)
+else:
+    ADAPTIVE_GAP_OFFSET = 0
 
 def save_pipe_heatmap():
     with open(PIPE_HEATMAP_FILE, 'w') as f:
@@ -206,6 +213,21 @@ def show_game_over_screen(score):
                 elif event.key == pygame.K_ESCAPE:
                     pygame.quit()
                     sys.exit()
+
+def save_adaptive_gap_offset():
+    with open(ADAPTIVE_GAP_FILE, 'w') as f:
+        json.dump({'offset': ADAPTIVE_GAP_OFFSET}, f)
+
+def get_adaptive_gap_center(top_height):
+    return top_height + PIPE_GAP // 2 + ADAPTIVE_GAP_OFFSET
+
+def adjust_adaptive_gap_offset(direction, step=5):
+    global ADAPTIVE_GAP_OFFSET
+    if direction == 'down':
+        ADAPTIVE_GAP_OFFSET = min(PIPE_GAP//2-10, ADAPTIVE_GAP_OFFSET + step)
+    elif direction == 'up':
+        ADAPTIVE_GAP_OFFSET = max(-PIPE_GAP//2+10, ADAPTIVE_GAP_OFFSET - step)
+    save_adaptive_gap_offset()
 
 # Main game loop
 def main():
