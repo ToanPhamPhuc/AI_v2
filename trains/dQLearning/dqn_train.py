@@ -1,10 +1,13 @@
 import pygame
 import sys
-from ai.training_loop import train_ai
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from ai.dqn_agent import FlappyBirdDQN
 from config.config import *
 from game.main import get_adaptive_gap_center, ground_img, screen
 
-HIGH_SCORE_FILE = 'AI_high_score.txt'
+HIGH_SCORE_FILE = 'data/scores/DQN_high_score.txt'
 
 def load_high_score():
     try:
@@ -20,15 +23,13 @@ def save_high_score(score):
     except Exception:
         pass
 
-def continuous_train():
-    """Train the AI continuously until user stops it"""
+def dqn_train():
+    """Train the DQN AI continuously until user stops it"""
     pygame.init()
     
-    print("Starting Continuous AI Training for Flappy Bird...")
-    print("The AI will learn continuously until you stop it.")
-    
-    # Global flag to control training
-    training_active = True
+    print("Starting Deep Q-Learning (DQN) Training for Flappy Bird...")
+    print("The AI will learn continuously using a neural network.")
+    print("Press Q to quit, A/H/C/G for visual toggles")
     
     # Global variables for visual toggles
     global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
@@ -42,16 +43,12 @@ def continuous_train():
     recent_scores = []  # Track recent scores for average
     high_score = load_high_score()  # Track high score
     
-    # Initialize AI and reward system once
-    from ai.ai_agent import FlappyBirdAI
+    # Initialize DQN AI and reward system
     from game.reward_system import RewardSystem
-    from game.main import Bird, Pipe, clock, save_pipe_heatmap, load_pipe_heatmap, adjust_adaptive_gap_offset
+    from game.main import Bird, Pipe, clock, save_pipe_heatmap, load_pipe_heatmap
     
-    ai = FlappyBirdAI()
+    ai = FlappyBirdDQN()
     reward_system = RewardSystem()
-    
-    # Load existing Q-table if available
-    ai.load_q_table()
     
     # Load pipe heatmap
     load_pipe_heatmap()
@@ -64,11 +61,11 @@ def continuous_train():
             score = 0
             game_over = False
             
-            # Get initial state
-            state = ai.get_state(bird, pipes)
+            # Get initial state (continuous)
+            state = ai.get_continuous_state(bird, pipes)
             
             while not game_over:
-                # Handle input events in main thread
+                # Handle input events
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         return
@@ -90,10 +87,7 @@ def continuous_train():
                         elif event.key == pygame.K_g:
                             show_gap_distances = not show_gap_distances
                 
-                if not training_active:
-                    break
-                
-                # Get AI action using smart action selection
+                # Get AI action using DQN
                 action = ai.get_smart_action(state, bird, pipes)
                 
                 # Apply action
@@ -131,22 +125,22 @@ def continuous_train():
                     game_over = True
                 
                 # Get next state
-                next_state = ai.get_state(bird, pipes)
+                next_state = ai.get_continuous_state(bird, pipes)
                 
-                # Calculate reward (now includes action for flap penalty)
+                # Calculate reward
                 reward = reward_system.calculate_reward(bird, pipes, score, game_over, action)
                 
-                # Update Q-table
-                ai.update_q_table(state, action, reward, next_state)
+                # Store experience in replay buffer
+                ai.memory.push(state, action, reward, next_state, game_over)
+                
+                # Update DQN network
+                ai.update()
                 
                 # Update state
                 state = next_state
                 
                 # Render every frame with controls displayed
                 render_frame(bird, pipes, score, generation, ai.epsilon, high_score, ai, state, action)
-            
-            if not training_active:
-                break
             
             # End generation and update learning parameters
             ai.end_episode()
@@ -159,7 +153,7 @@ def continuous_train():
             # Update best score and high score
             if score > best_score:
                 best_score = score
-                ai.save_q_table()
+                ai.save_model()
                 print(f"🎉 New best score: {best_score} (Generation {generation + 1})")
             
             # Update high score
@@ -179,16 +173,19 @@ def continuous_train():
             # Print progress every 50 generations
             if generation % 50 == 0:
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
-                print(f"Generation {generation}, Current Score: {score}, Best: {best_score}, High: {high_score}, Avg: {avg_recent:.1f}, ε: {ai.epsilon:.3f}")
+                stats = ai.get_learning_stats()
+                print(f"Generation {generation}, Current Score: {score}, Best: {best_score}, High: {high_score}, Avg: {avg_recent:.1f}, ε: {ai.epsilon:.3f}, Loss: {stats['avg_loss']:.4f}")
             
             # Save progress every 100 generations
             if generation % 100 == 0:
-                ai.save_q_table()
+                ai.save_model()
                 avg_recent = sum(recent_scores) / len(recent_scores) if recent_scores else 0
                 print(f"✅ Saved progress! Generation {generation}, Best score: {best_score}, High score: {high_score}, Recent avg: {avg_recent:.1f}")
     
     except Exception as e:
         print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
     
     finally:
         print(f"\n🏁 Training stopped! Final stats:")
@@ -196,8 +193,10 @@ def continuous_train():
         print(f"Best score achieved: {best_score}")
         print(f"High score achieved: {high_score}")
         if 'ai' in locals():
+            stats = ai.get_learning_stats()
             print(f"Final epsilon: {ai.epsilon:.4f}")
-            print(f"Q-table size: {len(ai.q_table)} states")
+            print(f"Final loss: {stats['avg_loss']:.4f}")
+            print(f"Memory size: {stats['memory_size']}")
         print("Final progress has been saved.")
         save_high_score(high_score)
         pygame.quit()
@@ -212,6 +211,7 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     """Render a single frame for visualization with controls and Q-values displayed"""
     from game.main import clock, background_img
     global show_axes, show_hitboxes, show_collision_zones, show_gap_distances
+    
     # Draw background first
     screen.blit(background_img, (0, 0))
     draw_ground()
@@ -223,25 +223,26 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
         if pipes:
             gap_center_y = get_adaptive_gap_center(pipes[0].top_height)
             pygame.draw.line(screen, (255, 0, 255), (0, gap_center_y), (SCREEN_WIDTH, gap_center_y), 2)
+    
+    # Draw pipes
     for pipe in pipes:
         pipe.draw()
         if show_hitboxes:
             pygame.draw.rect(screen, RED, (pipe.x, 0, pipe.width, pipe.top_height), 3)
             pygame.draw.rect(screen, RED, (pipe.x, SCREEN_HEIGHT - pipe.bottom_height - GROUND_HEIGHT, pipe.width, pipe.bottom_height), 3)
+    
     # Draw bird sprite
     bird.draw()
+    
     # Draw bird hitbox if enabled
     if show_hitboxes:
         rect = bird.get_rect()
         pygame.draw.rect(screen, RED, rect, 2)
         # Draw ground collider
         pygame.draw.rect(screen, RED, (0, SCREEN_HEIGHT - GROUND_HEIGHT, SCREEN_WIDTH, GROUND_HEIGHT), 2)
+    
     # Draw collision zones if enabled
     if show_collision_zones and pipes:
-        next_pipe = pipes[0]
-        gap_center_y = next_pipe.top_height + PIPE_GAP // 2
-        
-        # Draw collision zones on pipes
         for pipe in pipes:
             # Top pipe collision zone
             pygame.draw.rect(screen, (255, 0, 0, 100), (pipe.x, 0, pipe.width, pipe.top_height))
@@ -285,15 +286,15 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     generation_text = font.render(f"Generation: {generation}", True, BLACK)
     epsilon_text = font.render(f"Epsilon: {epsilon:.3f}", True, BLACK)
     
-    # Q-values for current state
-    q_values = ai.q_table.get(state, [0, 0])
+    # Q-values for current state (from DQN)
+    q_values = ai.get_q_values(state)
     q_wait_text = font_small.render(f"Q(WAIT): {q_values[0]:.2f}", True, BLACK)
     q_flap_text = font_small.render(f"Q(FLAP): {q_values[1]:.2f}", True, BLACK)
     
     # Current action indicator
     action_text = font_small.render(f"Action: {'FLAP' if action == 1 else 'WAIT'}", True, (255, 0, 0) if action == 1 else (0, 0, 255))
     
-    # State information with bird-gap difference
+    # State information with continuous values
     if pipes:
         next_pipe = pipes[0]
         gap_center_y = get_adaptive_gap_center(next_pipe.top_height)
@@ -303,11 +304,14 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     else:
         state_text = font_small.render("No pipes", True, BLACK)
     
+    # DQN-specific info
+    stats = ai.get_learning_stats()
+    dqn_info = f"Loss: {stats['avg_loss']:.4f}, Memory: {stats['memory_size']}"
+    dqn_text = font_small.render(dqn_info, True, BLACK)
+    
     # Controls
     controls_text1 = font_small.render("Q: Quit | A: Toggle Axes | H: Toggle Hitboxes", True, BLACK)
     controls_text2 = font_small.render("C: Toggle Collision Zones | B: Clear Pipe Heatmap | G: Gap Dists", True, BLACK)
-
-
     
     # Position everything at the top
     screen.blit(score_text, (10, 10))
@@ -321,7 +325,8 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     screen.blit(action_text, (SCREEN_WIDTH - 150, 50))
     
     # State info (bottom)
-    screen.blit(state_text, (10, SCREEN_HEIGHT - 80))
+    screen.blit(state_text, (10, SCREEN_HEIGHT - 100))
+    screen.blit(dqn_text, (10, SCREEN_HEIGHT - 80))
     screen.blit(controls_text1, (10, SCREEN_HEIGHT - 60))
     screen.blit(controls_text2, (10, SCREEN_HEIGHT - 40))
     
@@ -329,4 +334,4 @@ def render_frame(bird, pipes, score, generation, epsilon, high_score, ai, state,
     clock.tick(60)
 
 if __name__ == "__main__":
-    continuous_train() 
+    dqn_train() 

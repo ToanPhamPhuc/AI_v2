@@ -21,10 +21,12 @@ PIPE_SPEED = 5
 PIPE_GAP = 180  # Increased from 150 for a wider gap
 GROUND_HEIGHT = 100  # Height of the ground layer (increased for lower ground)
 
-# File paths
-HIGH_SCORE_FILE = "high_score.txt"
-Q_TABLE_FILE = "q_table.json"
-DQN_MODEL_FILE = "dqn_model.pth"
+# File paths - Organized structure
+HIGH_SCORE_FILE = "data/scores/high_score.txt"
+Q_TABLE_FILE = "data/jsons/q_table.json"
+DQN_MODEL_FILE = "data/pth/dqn_model.pth"
+PIPE_HEATMAP_FILE = "data/jsons/pipe_heatmap.json"
+ADAPTIVE_GAP_OFFSET_FILE = "data/jsons/adaptive_gap_offset.json"
 
 # AI Learning parameters - IMPROVED
 LEARNING_RATE = 0.15  # Increased for faster learning

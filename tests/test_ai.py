@@ -1,5 +1,8 @@
 import pygame
 import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from ai.ai_agent import FlappyBirdAI
 from game.reward_system import RewardSystem
 from game.main import Bird, Pipe, screen, clock, draw_ground
@@ -97,6 +100,8 @@ def test_trained_ai():
         pygame.display.flip()
         clock.tick(60)
     
+    print(f"Final score: {score}")
+    print(f"Total reward: {total_reward:.1f}")
     pygame.quit()
     sys.exit()
 
