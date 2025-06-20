@@ -24,6 +24,7 @@ GROUND_HEIGHT = 100  # Height of the ground layer (increased for lower ground)
 # File paths
 HIGH_SCORE_FILE = "high_score.txt"
 Q_TABLE_FILE = "q_table.json"
+DQN_MODEL_FILE = "dqn_model.pth"
 
 # AI Learning parameters - IMPROVED
 LEARNING_RATE = 0.15  # Increased for faster learning
@@ -32,11 +33,22 @@ EPSILON = 0.2  # Higher initial exploration
 EPSILON_DECAY = 0.9999  # Slower decay to maintain exploration longer
 EPSILON_MIN = 0.05  # Higher minimum to maintain some exploration
 
+# DQN-specific parameters
+DQN_LEARNING_RATE = 0.001  # Lower learning rate for neural network
+DQN_DISCOUNT_FACTOR = 0.99  # Same discount factor
+DQN_EPSILON = 0.1  # Lower initial exploration for DQN
+DQN_EPSILON_DECAY = 0.995  # Faster decay for DQN
+DQN_EPSILON_MIN = 0.01  # Lower minimum exploration
+DQN_BATCH_SIZE = 32  # Batch size for experience replay
+DQN_TARGET_UPDATE_FREQ = 1000  # How often to update target network
+DQN_MEMORY_SIZE = 10000  # Experience replay buffer size
+DQN_HIDDEN_SIZE = 128  # Hidden layer size for neural network
+
 # AI Training parameters
 DEFAULT_EPISODES = 1000
 RENDER_EVERY = 100
 
-# AI State discretization - IMPROVED
+# AI State discretization - IMPROVED (for Q-table approach)
 BIRD_Y_DIVISOR = 25  # Finer state representation
 BIRD_VELOCITY_DIVISOR = 1  # Fine velocity states
 PIPE_X_DIVISOR = 25  # Finer distance representation
